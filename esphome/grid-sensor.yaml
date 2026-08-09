@@ -1,0 +1,277 @@
+# ESPHome CT Grid Sensor for Victron Venus OS
+#
+# ESP32-based Current Transformer sensor for monitoring household grid power.
+# Publishes to MQTT; companion D-Bus service (dbus_grid_service.py) registers
+# it as a grid meter (com.victronenergy.grid) on Venus OS.
+#
+# Hardware:
+#   - ESP32 DevKit V1 or similar
+#   - SCT-013-000 CT sensor (0-100A, 0-50mA output)
+#   - 3.5mm stereo jack for CT connection
+#   - Burden resistor: 33 ohm (for 3.3V ADC) or 100 ohm (for 5V ADC with divider)
+#   - Optional: ADS1115 ADC for better resolution (16-bit vs ESP32 12-bit)
+#
+# Calibration:
+#   - Measure known load, adjust `ct_calibration` until reading matches
+#   - Typical SCT-013: 100A = 50mA, burden 33Ω → 1.65V at 100A
+#   - ESP32 ADC: 3.3V = 4095 counts → ~24.4 mA/bit (single-ended)
+#   - With ADS1115: ±2.048V range, 16-bit → ~0.0625 mV/LSB
+
+esphome:
+  name: grid-sensor
+  friendly_name: "Grid Power Sensor"
+  project:
+    name: "victron-venus.dbusesp-grid-sensor"
+    version: "1.0.0"
+  on_boot:
+    priority: 600
+    then:
+      - mqtt.publish:
+          topic: "grid-sensor/status"
+          payload: '{"status":"online","version":"1.0.0"}'
+          retain: true
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+    version: recommended
+
+# WiFi Configuration
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  manual_ip:
+    static_ip: !secret grid_sensor_ip
+    gateway: !secret wifi_gateway
+    subnet: 255.255.255.0
+    dns1: !secret wifi_gateway
+  ap:
+    ssid: "GridSensor-Fallback"
+    password: !secret ap_password
+  power_save_mode: none
+
+# Enable logging
+logger:
+  level: INFO
+  baud_rate: 115200
+  hardware_uart: UART0
+
+# Enable Home Assistant API (for debugging)
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+# OTA Updates
+ota:
+  platform: esphome
+  password: !secret ota_password
+
+# MQTT Client
+mqtt:
+  broker: !secret mqtt_broker
+  port: !secret mqtt_port
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  client_id: grid-sensor
+  discovery: true
+  discovery_retain: true
+  birth_message:
+    topic: "grid-sensor/status"
+    payload: '{"status":"online"}'
+    retain: true
+  will_message:
+    topic: "grid-sensor/status"
+    payload: '{"status":"offline"}'
+    retain: true
+
+# I2C for ADS1115 (optional)
+i2c:
+  sda: GPIO21
+  scl: GPIO22
+  scan: true
+  id: bus_a
+
+# ADS1115 ADC for CT sensor (optional, higher resolution)
+# Uncomment if using ADS1115
+# ads1115:
+#   - address: 0x48
+#     i2c_id: bus_a
+#     id: ads1115_1
+
+# Current Transformer Sensor
+# Using ESP32 ADC directly (GPIO34 = ADC1_CH6, input only)
+sensor:
+  # CT Sensor on ADC pin (GPIO34)
+  - platform: adc
+    pin: GPIO34
+    name: "Grid Current"
+    id: grid_current_adc
+    update_interval: 1s
+    attenuation: 11db
+    samples: 64
+    filters:
+      - sliding_window_moving_average:
+          window_size: 10
+      - calibrate_linear:
+          - 0.0 -> 0.0
+          # Calibrate: measure known current, adjust second point
+          # Example: 10A measured -> 2.1V, 100A -> 3.3V (clipped)
+          # - 2.1 -> 10.0
+    # Calibration formula: A = (V - Voffset) * scale
+    # For SCT-013-000 with 33Ω burden: 100A = 50mA = 1.65V
+    # Voffset ≈ 1.65V (mid-supply), scale = 100A / (3.3V - 1.65V) = 60.6 A/V
+    # Better: measure and calibrate at known loads
+
+  # Voltage sensor for power calculation (if using voltage divider on another ADC)
+  # - platform: adc
+  #   pin: GPIO35
+  #   name: "Grid Voltage"
+  #   id: grid_voltage_adc
+  #   update_interval: 1s
+  #   attenuation: 11db
+  #   samples: 64
+  #   filters:
+  #     - sliding_window_moving_average:
+  #         window_size: 10
+  #     - calibrate_linear:
+  #         - 0.0 -> 0.0
+  #         - 3.3 -> 240.0  # Adjust for your voltage divider
+
+  # Alternatively, use ADS1115 for better resolution
+  # - platform: ads1115
+  #   ads1115_id: ads1115_1
+  #   multiplexer: "A0_GND"
+  #   name: "Grid Current ADS1115"
+  #   id: grid_current_ads
+  #   gain: 4.096
+  #   update_interval: 1s
+  #   filters:
+  #     - sliding_window_moving_average:
+  #         window_size: 10
+
+  # Power sensor (calculated from current * voltage)
+  # Assumes ~230V RMS, PF=1 for resistive loads
+  - platform: template
+    name: "Grid Power"
+    id: grid_power
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: 1s
+    lambda: |
+      // Calculate real power: P = V * I * PF
+      // Using nominal 230V and measured current (RMS)
+      // For better accuracy, add voltage sensor
+      float current = id(grid_current_adc).state;
+      float voltage = 230.0;  // Nominal voltage - replace with voltage sensor
+      float pf = 1.0;         // Power factor - assume 1.0 for resistive
+      return current * voltage * pf;
+
+  # Energy sensor (integrated power)
+  - platform: integration
+    name: "Grid Energy Forward"
+    id: grid_energy_forward
+    sensor: grid_power
+    unit_prefix: k
+    time_unit: h
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    restore: true
+    icon: "mdi:flash"
+
+  # Energy reverse (if feed-in)
+  - platform: integration
+    name: "Grid Energy Reverse"
+    id: grid_energy_reverse
+    sensor: grid_power
+    unit_prefix: k
+    time_unit: h
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    restore: true
+    icon: "mdi:flash"
+    filters:
+      - lambda: |
+          // Only integrate negative power (feed-in)
+          if (x < 0) return -x;
+          return 0;
+
+# Binary sensor for status
+binary_sensor:
+  - platform: status
+    name: "Grid Sensor Status"
+    id: grid_sensor_status
+
+  - platform: template
+    name: "Grid Feed-In Active"
+    id: grid_feed_in_active
+    device_class: power
+    lambda: |
+      return id(grid_power).state < -50;  // Feed-in > 50W
+
+# Text sensor for diagnostics
+text_sensor:
+  - platform: template
+    name: "Grid Sensor Diagnostics"
+    id: grid_diagnostics
+    update_interval: 30s
+    lambda: |
+      char buf[256];
+      snprintf(buf, sizeof(buf),
+        "Current: %.2fA, Power: %.0fW, EnergyF: %.3fkWh, EnergyR: %.3fkWh",
+        id(grid_current_adc).state,
+        id(grid_power).state,
+        id(grid_energy_forward).state,
+        id(grid_energy_reverse).state
+      );
+      return {buf};
+
+# Status LED
+output:
+  - platform: gpio
+    pin: GPIO2
+    id: status_led
+
+light:
+  - platform: binary
+    name: "Grid Sensor LED"
+    output: status_led
+    id: status_light
+
+# Button for manual calibration mode
+button:
+  - platform: restart
+    name: "Grid Sensor Restart"
+    id: restart_button
+
+  - platform: template
+    name: "Toggle Calibration Mode"
+    id: toggle_calibration
+    on_press:
+      then:
+        - light.toggle: status_light
+        - mqtt.publish:
+            topic: "grid-sensor/calibration"
+            payload: '{"action":"toggle"}'
+
+# Switch for enabling/disabling MQTT publishing
+switch:
+  - platform: template
+    name: "MQTT Publishing"
+    id: mqtt_publishing
+    optimistic: true
+    initial_state: true
+    turn_on_action:
+      - mqtt.publish:
+          topic: "grid-sensor/control"
+          payload: '{"mqtt_enabled":true}'
+          retain: true
+    turn_off_action:
+      - mqtt.publish:
+          topic: "grid-sensor/control"
+          payload: '{"mqtt_enabled":false}'
+          retain: true

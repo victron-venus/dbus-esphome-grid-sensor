@@ -1,0 +1,74 @@
+# docker-compose.yml for dbus-esphome-grid-sensor
+# Deploys D-Bus service alongside MQTT broker for Venus OS
+
+services:
+  # MQTT Broker (Eclipse Mosquitto)
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: dbus-grid-mosquitto
+    ports:
+      - "1883:1883"
+      - "9001:9001"  # WebSockets
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+    networks:
+      - grid-sensor-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/broker/uptime", "-C", "1", "-i", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # D-Bus Grid Service
+  dbus-grid-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dbus-grid-service
+    environment:
+      - MQTT_BROKER=mosquitto
+      - MQTT_PORT=1883
+      - MQTT_USERNAME=${MQTT_USERNAME:-}
+      - MQTT_PASSWORD=${MQTT_PASSWORD:-}
+      - MQTT_TOPIC_PREFIX=grid-sensor
+      - DBUS_INSTANCE=${DBUS_INSTANCE:-42}
+      - DEVICE_INSTANCE=${DEVICE_INSTANCE:-42}
+      - CUSTOM_NAME=${CUSTOM_NAME:-ESPHome CT Grid Sensor}
+      - RECONNECT_DELAY=5
+    volumes:
+      - /var/run/dbus:/var/run/dbus
+      - /run:/run
+    network_mode: "host"  # Required for D-Bus access on Venus OS
+    privileged: true  # Required for D-Bus system bus access
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Optional: ESPHome dashboard for device management
+  # esphome-dashboard:
+  #   image: esphome/esphome:latest
+  #   container_name: esphome-dashboard
+  #   ports:
+  #     - "6052:6052"
+  #   volumes:
+  #     - ./esphome:/config
+  #   network_mode: "host"
+  #   restart: unless-stopped
+
+networks:
+  grid-sensor-net:
+    driver: bridge
+    name: grid-sensor-network
+
+volumes:
+  mosquitto-data:
+  mosquitto-log:

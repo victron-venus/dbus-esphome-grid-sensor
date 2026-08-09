@@ -1,0 +1,22 @@
+#!/bin/sh
+# daemontools run script for dbus-grid-service
+# This file is installed to /service/dbus-grid-service/run by install.sh
+
+# Load environment configuration
+if [ -f /opt/victronenergy/dbus-grid-service/.env ]; then
+    export $(grep -v '^#' /opt/victronenergy/dbus-grid-service/.env | xargs)
+fi
+
+# Ensure D-Bus system bus is available
+mkdir -p /var/run/dbus
+if [ ! -S /var/run/dbus/system_bus_socket ]; then
+    # Start D-Bus if not running (should be running on Venus OS)
+    dbus-daemon --system --fork 2>/dev/null || true
+fi
+
+# Change to installation directory
+cd /opt/victronenergy/dbus-grid-service
+
+# Run the Python service
+# Use exec to replace shell with python process (proper daemontools behavior)
+exec python3 dbus_grid_service.py
