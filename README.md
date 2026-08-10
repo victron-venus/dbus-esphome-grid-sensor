@@ -1,15 +1,72 @@
 # dbus-esphome-grid-sensor
 
+[![GitHub Release](https://img.shields.io/github/v/release/victron-venus/dbus-esphome-grid-sensor?label=version)](https://github.com/victron-venus/dbus-esphome-grid-sensor/releases)
+[![License: MIT](https://img.shields.io/github/license/victron-venus/dbus-esphome-grid-sensor)](LICENSE)
+[![Python Version](https://img.shields.io/badge/python-3.11%2B-blue)](pyproject.toml)
+[![ESPHome](https://img.shields.io/badge/ESPHome-2024.0%2B-2496ED?logo=esphome&logoColor=white)](https://esphome.io/)
+[![Victron Venus OS](https://img.shields.io/badge/Victron-Venus%20OS-orange)](https://www.victronenergy.com/live/venus-os:start)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
+
 ESP32-based Current Transformer (CT) sensor for monitoring household grid power, with a companion D-Bus service that registers it as a grid meter (`com.victronenergy.grid`) in Victron Venus OS.
 
 ## Architecture
 
-```
-┌─────────────────┐     MQTT      ┌──────────────────┐     D-Bus      ┌────────────────┐
-│  ESP32 + CT     │ ───────────▶  │  dbus_grid_      │ ───────────▶  │  Venus OS      │
-│  Sensor         │  grid-sensor/ │  service.py      │  com.victron-  │  (Cerbo GX,    │
-│  (ESPHome)      │               │                  │  energy.grid   │  Venus OS)     │
-└─────────────────┘               └──────────────────┘                └────────────────┘
+```mermaid
+flowchart LR
+    subgraph Hardware["⚡ Hardware Layer"]
+        CT["SCT-013-000 CT Sensor\n(0-100A, 0-50mA)"]
+        ESP32["ESP32 DevKit V1\n(ADC1_CH6 / GPIO34)"]
+        ADS1115["ADS1115 16-bit ADC\n(I2C, optional)"]
+        Burden["33Ω Burden Resistor\n(1.65V @ 100A)"]
+        Jack["3.5mm Stereo Jack\nPanel Mount"]
+    end
+
+    subgraph Firmware["📦 ESPHome Firmware"]
+        CurrentSensor["ADC Sensor\n64 samples, sliding avg"]
+        PowerCalc["Template Sensor\nP = V × I × PF"]
+        EnergyFwd["Integration Sensor\n∫P dt (import)"]
+        EnergyRev["Integration Sensor\n∫(-P) dt (export)"]
+        MQTTClient["MQTT Client\nDiscovery + Retain"]
+    end
+
+    subgraph Bridge["🌉 Bridge Service (Python)"]
+        Sub["MQTT Subscriber\ngrid-sensor/#"]
+        DBusPub["D-Bus Publisher\ncom.victronenergy.grid"]
+        Instance["Device Instance 42"]
+    end
+
+    subgraph VenusOS["🔧 Venus OS (Cerbo GX)"]
+        DBUS["D-Bus System Bus"]
+        GUI["VRM Portal / Local UI"]
+        InverterCtrl["Inverter Control\n(Grid-zero, ESS)"]
+    end
+
+    CT -.->|Clamp| Jack
+    Jack -->|Tip: Signal| Burden
+    Jack -->|Ring: GND| ESP32
+    Burden -->|1.65V @ 100A| ESP32
+    ESP32 -.->|Optional I2C| ADS1115
+    ESP32 --> CurrentSensor
+    CurrentSensor --> PowerCalc
+    PowerCalc --> EnergyFwd
+    PowerCalc --> EnergyRev
+    EnergyFwd & EnergyRev & CurrentSensor & PowerCalc --> MQTTClient
+    MQTTClient -.->|MQTT\nTLS optional| Sub
+    Sub --> DBusPub
+    DBusPub --> Instance
+    Instance --> DBUS
+    DBUS --> GUI
+    DBUS --> InverterCtrl
+
+    classDef hw fill:#fef3c7,stroke:#f59e0b,color:#92400e;
+    classDef fw fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f;
+    classDef br fill:#fce7f3,stroke:#ec4899,color:#831843;
+    classDef vo fill:#dcfce7,stroke:#22c55e,color:#14532d;
+
+    class CT,ESP32,ADS1115,Burden,Jack hw;
+    class CurrentSensor,PowerCalc,EnergyFwd,EnergyRev,MQTTClient fw;
+    class Sub,DBusPub,Instance br;
+    class DBUS,GUI,InverterCtrl vo;
 ```
 
 ## Features
@@ -27,38 +84,97 @@ ESP32-based Current Transformer (CT) sensor for monitoring household grid power,
 
 | Component | Specification | Notes |
 |-----------|---------------|-------|
-| ESP32 | DevKit V1, ESP32-S3, or similar | Any ESP32 with ADC |
+| ESP32 | DevKit V1, ESP32-S3, or similar | Any ESP32 with ADC (GPIO34 input-only) |
 | CT Sensor | SCT-013-000 (100A, 50mA output) | Or compatible 0-50mA CT |
 | Burden Resistor | 33Ω (3.3V ADC) / 100Ω (5V+divider) | Calculated for 1.65V at 100A |
 | 3.5mm Jack | Stereo, panel mount | For CT connection |
 | Optional | ADS1115 (16-bit ADC) | For better resolution |
 
-### Wiring Diagram
+## Wiring Diagram
 
+```mermaid
+flowchart TB
+    subgraph CT["🔌 SCT-013-000 CT Sensor"]
+        CT_CORE["Ferrite Core\n(Clamp around L1)"]
+        CT_WHITE["White Wire\nSignal (50mA @ 100A)"]
+        CT_BLACK["Black Wire\nGND / Return"]
+        CT_RED["Red Wire\n(Unused for 50mA version)"]
+    end
+
+    subgraph JACK["🔌 3.5mm Stereo Jack (Panel Mount)"]
+        TIP["Tip (T)\nSignal"]
+        RING["Ring (R)\nGND"]
+        SLEEVE["Sleeve (S)\nNot Connected"]
+    end
+
+    subgraph BURDEN["⚡ Burden Resistor Circuit"]
+        R33["33Ω Resistor\n(0603 / 0805 SMD or through-hole)"]
+        VREF["Virtual Ground\n1.65V (mid-rail)"]
+        CAP["100nF Decoupling\n(optional, noise reduction)"]
+    end
+
+    subgraph ESP["🧠 ESP32 DevKit V1"]
+        GPIO34["GPIO34 (ADC1_CH6)\nInput-only ADC pin"]
+        GND["GND"]
+        V33["3.3V"]
+        EN["EN (Reset)"]
+    end
+
+    subgraph ADS["📊 ADS1115 (Optional)"]
+        A0["AIN0/GND\nDifferential"]
+        A1["AIN1/GND\n(Unused)"]
+        A2["AIN2/GND\n(Unused)"]
+        A3["AIN3/GND\n(Unused)"]
+        SDA["SDA → GPIO21"]
+        SCL["SCL → GPIO22"]
+        VDD["VDD → 3.3V"]
+        ADDR["ADDR → GND (0x48)"]
+    end
+
+    CT_CORE -.->|Magnetic\ncoupling| CT_WHITE
+    CT_WHITE -->|Current| TIP
+    CT_BLACK -->|Return| RING
+    CT_RED -.->|Not connected| SLEEVE
+
+    TIP -->|Signal| R33
+    RING -->|GND| GND
+    R33 -->|1.65V @ 100A| GPIO34
+    R33 -.->|To 3.3V/GND| VREF
+    VREF -.->|Stable bias| R33
+    CAP -.->|Noise filter| R33
+
+    ESP32 -.->|I2C| SDA
+    ESP32 -.->|I2C| SCL
+    A0 -->|Differential| ADS1115
+
+    classDef ct fill:#fee2e2,stroke:#ef4444,color:#991b1b;
+    classDef jack fill:#fef3c7,stroke:#f59e0b,color:#92400e;
+    classDef burden fill:#fefce8,stroke:#eab308,color:#713f12;
+    classDef esp fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f;
+    classDef ads fill:#fce7f3,stroke:#ec4899,color:#831843;
+
+    class CT_CORE,CT_WHITE,CT_BLACK,CT_RED ct;
+    class TIP,RING,SLEEVE jack;
+    class R33,VREF,CAP burden;
+    class GPIO34,GND,V33,EN esp;
+    class A0,A1,A2,A3,SDA,SCL,VDD,ADDR ads;
 ```
-                    SCT-013-000 CT Sensor
-                         ┌─────────┐
-                  White ┤         ├ Red (not used for 50mA version)
-                         │  CT     │
-                  Black ┤         │
-                         └────┬────┘
-                              │
-                     3.5mm Stereo Jack
-                      ┌───┬───┐
-                      │ T │ R │  Tip = Signal (White)
-                      │   │   │  Ring = GND (Black)
-                      │ S │   │  Sleeve = Not connected
-                      └───┴───┘
-                         │   │
-                    GPIO34  GND
-                   (ADC1_6)  (ESP32)
-```
+
+### Pinout Summary
+
+| CT Wire | Jack Pin | ESP32 Pin | Function |
+|---------|----------|-----------|----------|
+| White (Signal) | Tip | GPIO34 + 33Ω to 1.65V | CT Signal |
+| Black (GND) | Ring | GND | Ground reference |
+| Red | Sleeve | — | Not connected |
 
 ### Burden Resistor Calculation
 
 For SCT-013-000 (100A = 50mA secondary):
 - Target: 1.65V at 100A (mid-rail on 3.3V ADC)
 - Burden = V / I = 1.65V / 0.05A = **33Ω**
+
+> **Note**: Use 1% metal film resistor. Place close to ESP32 pin. Add 100nF capacitor from signal to GND for noise reduction.
 
 ## Quick Start
 
