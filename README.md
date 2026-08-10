@@ -99,6 +99,7 @@ flowchart TD
 ```mermaid
 flowchart TB
     subgraph CT["🔌 SCT-013-000 CT Sensor"]
+        direction TB
         CT_CORE["Ferrite Core\n(Clamp around L1)"]
         CT_WHITE["White Wire\nSignal (50mA @ 100A)"]
         CT_BLACK["Black Wire\nGND / Return"]
@@ -106,18 +107,21 @@ flowchart TB
     end
 
     subgraph JACK["🔌 3.5mm Stereo Jack (Panel Mount)"]
+        direction TB
         TIP["Tip (T)\nSignal"]
         RING["Ring (R)\nGND"]
         SLEEVE["Sleeve (S)\nNot Connected"]
     end
 
     subgraph BURDEN["⚡ Burden Resistor Circuit"]
+        direction TB
         R33["33Ω Resistor\n(0603 / 0805 SMD or through-hole)"]
         VREF["Virtual Ground\n1.65V (mid-rail)"]
         CAP["100nF Decoupling\n(optional, noise reduction)"]
     end
 
     subgraph ESP["🧠 ESP32 DevKit V1"]
+        direction TB
         GPIO34["GPIO34 (ADC1_CH6)\nInput-only ADC pin"]
         GND["GND"]
         V33["3.3V"]
@@ -125,6 +129,7 @@ flowchart TB
     end
 
     subgraph ADS["📊 ADS1115 (Optional)"]
+        direction TB
         A0["AIN0/GND\nDifferential"]
         A1["AIN1/GND\n(Unused)"]
         A2["AIN2/GND\n(Unused)"]
