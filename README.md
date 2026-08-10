@@ -12,8 +12,9 @@ ESP32-based Current Transformer (CT) sensor for monitoring household grid power,
 ## Architecture
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph Hardware["⚡ Hardware Layer"]
+        direction TB
         CT["SCT-013-000 CT Sensor\n(0-100A, 0-50mA)"]
         ESP32["ESP32 DevKit V1\n(ADC1_CH6 / GPIO34)"]
         ADS1115["ADS1115 16-bit ADC\n(I2C, optional)"]
@@ -22,6 +23,7 @@ flowchart LR
     end
 
     subgraph Firmware["📦 ESPHome Firmware"]
+        direction TB
         CurrentSensor["ADC Sensor\n64 samples, sliding avg"]
         PowerCalc["Template Sensor\nP = V × I × PF"]
         EnergyFwd["Integration Sensor\n∫P dt (import)"]
@@ -30,12 +32,14 @@ flowchart LR
     end
 
     subgraph Bridge["🌉 Bridge Service (Python)"]
+        direction TB
         Sub["MQTT Subscriber\ngrid-sensor/#"]
         DBusPub["D-Bus Publisher\ncom.victronenergy.grid"]
         Instance["Device Instance 42"]
     end
 
     subgraph VenusOS["🔧 Venus OS (Cerbo GX)"]
+        direction TB
         DBUS["D-Bus System Bus"]
         GUI["VRM Portal / Local UI"]
         InverterCtrl["Inverter Control\n(Grid-zero, ESS)"]
