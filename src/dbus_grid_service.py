@@ -34,7 +34,7 @@ from typing import Any
 import paho.mqtt.client as mqtt
 from dbus.mainloop.glib import DBusGMainLoop
 from gi.repository import GLib
-from paho.mqtt.client import DisconnectFlags
+from paho.mqtt.client import ConnectFlags, DisconnectFlags
 from paho.mqtt.enums import CallbackAPIVersion
 from paho.mqtt.properties import Properties
 from paho.mqtt.reasoncodes import ReasonCode
