@@ -14,7 +14,11 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-INSTALL_DIR="/opt/victronenergy/dbus-grid-service"
+# INSTALL_DIR lives under /data: Venus OS firmware updates restore /opt to
+# factory defaults and would wipe the installation
+INSTALL_DIR="/data/dbus-grid-service"
+# Persistent service dir survives /service tmpfs wipes; linked into /service
+SERVICE_DATA_DIR="/data/dbus-grid-service/service/dbus-grid-service"
 SERVICE_DIR="/service/dbus-grid-service"
 SERVICE_NAME="dbus-grid-service"
 DBUS_INSTANCE="${DBUS_INSTANCE:-42}"
@@ -117,18 +121,18 @@ EOF
 }
 
 create_daemontools_service() {
-    log_info "Creating daemontools service..."
+    log_info "Creating daemontools service at $SERVICE_DATA_DIR..."
 
-    mkdir -p "$SERVICE_DIR"
+    mkdir -p "$SERVICE_DATA_DIR/log"
 
     # Create run script
-    cat > "$SERVICE_DIR/run" <<'EOF'
+    cat > "$SERVICE_DATA_DIR/run" <<EOF
 #!/bin/sh
 # daemontools run script for dbus-grid-service
 
 # Load environment
-if [ -f /opt/victronenergy/dbus-grid-service/.env ]; then
-    export $(grep -v '^#' /opt/victronenergy/dbus-grid-service/.env | xargs)
+if [ -f $INSTALL_DIR/.env ]; then
+    export \$(grep -v '^#' $INSTALL_DIR/.env | xargs)
 fi
 
 # Ensure D-Bus is running
@@ -138,23 +142,60 @@ if [ ! -S /var/run/dbus/system_bus_socket ]; then
 fi
 
 # Change to install directory
-cd /opt/victronenergy/dbus-grid-service
+cd $INSTALL_DIR || exit 1
 
 # Run the service
 exec python3 dbus_grid_service.py
 EOF
 
-    chmod +x "$SERVICE_DIR/run"
+    chmod +x "$SERVICE_DATA_DIR/run"
 
-    # Create log directory
-    mkdir -p "$SERVICE_DIR/log"
-    cat > "$SERVICE_DIR/log/run" <<'EOF'
+    # Log pair (multilog — svlogd does not exist on Venus OS)
+    cat > "$SERVICE_DATA_DIR/log/run" <<'EOF'
 #!/bin/sh
+exec 2>&1
 exec multilog t s16777215 n10 /var/log/dbus-grid-service
 EOF
-    chmod +x "$SERVICE_DIR/log/run"
+    chmod +x "$SERVICE_DATA_DIR/log/run"
 
-    log_success "daemontools service created at $SERVICE_DIR"
+    # Replace any pre-existing /service entry: a real directory there would
+    # block ln -sf (it nests inside) and dies on reboot since /service is tmpfs
+    if [[ -d "$SERVICE_DIR" && ! -L "$SERVICE_DIR" ]]; then
+        log_warning "Replacing legacy service directory at $SERVICE_DIR..."
+        mv "$SERVICE_DIR" "${SERVICE_DIR}.old.$(date +%s)"
+    fi
+
+    # svscan caches each /service entry by inode and never re-evaluates whether
+    # a log pair exists; stop old supervision and swap in a fresh-inode copy so
+    # a full main+log pair gets created
+    svc -dx "$SERVICE_DIR" 2>/dev/null || true
+    sleep 1
+    cp -a "$SERVICE_DATA_DIR" "${SERVICE_DATA_DIR}.new"
+    mv "$SERVICE_DATA_DIR" "${SERVICE_DATA_DIR}.old"
+    mv "${SERVICE_DATA_DIR}.new" "$SERVICE_DATA_DIR"
+    find "${SERVICE_DATA_DIR}.old" -delete 2>/dev/null || true
+
+    ln -sfn "$SERVICE_DATA_DIR" "$SERVICE_DIR"
+
+    # Boot persistence: /service is tmpfs, rc.local recreates the symlink
+    local rc_local="/data/rc.local"
+    if [ ! -f "$rc_local" ]; then
+        echo "#!/bin/sh" > "$rc_local"
+        chmod +x "$rc_local"
+    fi
+    if ! grep -q "dbus-grid-service" "$rc_local" 2>/dev/null; then
+        cat >> "$rc_local" <<'EOF'
+
+# === dbus-grid-service persistence ===
+ln -sfn /data/dbus-grid-service/service/dbus-grid-service /service/dbus-grid-service
+sleep 2
+svc -u /service/dbus-grid-service 2>/dev/null || true
+# === end dbus-grid-service ===
+EOF
+        log_success "Added rc.local boot persistence block"
+    fi
+
+    log_success "daemontools service created at $SERVICE_DIR -> $SERVICE_DATA_DIR"
 }
 
 create_systemd_service() {
