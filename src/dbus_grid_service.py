@@ -20,14 +20,14 @@ D-Bus Paths (com.victronenergy.grid):
 - /ErrorCode               - Error code (0=none)
 """
 
-import os
-import sys
+import contextlib
 import json
-import time
-import signal
 import logging
+import os
+import signal
+import sys
 import threading
-from typing import Optional
+import time
 from dataclasses import dataclass, field
 
 import paho.mqtt.client as mqtt
@@ -38,7 +38,7 @@ from gi.repository import GLib
 try:
     from vedbus import VeDBusService
 except ImportError:
-    print("Error: vedbus not installed. Install with: pip install vedbus")
+    sys.stderr.write("Error: vedbus not installed. Install with: pip install vedbus\n")
     sys.exit(1)
 
 
@@ -66,13 +66,14 @@ logger = logging.getLogger("dbus-grid-service")
 @dataclass
 class GridData:
     """Container for grid sensor data"""
-    power: float = 0.0           # W
-    voltage: float = 230.0       # V
-    current: float = 0.0         # A
+
+    power: float = 0.0  # W
+    voltage: float = 230.0  # V
+    current: float = 0.0  # A
     energy_forward: float = 0.0  # kWh
     energy_reverse: float = 0.0  # kWh
-    frequency: float = 50.0      # Hz
-    status: int = 0              # 0=OK, 1=Warning, 2=Error
+    frequency: float = 50.0  # Hz
+    status: int = 0  # 0=OK, 1=Warning, 2=Error
     last_update: float = field(default_factory=time.time)
     connected: bool = False
 
@@ -85,7 +86,7 @@ class DBusGridService:
         self.device_instance = device_instance
         self.custom_name = custom_name
         self.data = GridData()
-        self.dbus_service: Optional[VeDBusService] = None
+        self.dbus_service: VeDBusService | None = None
         self.running = False
         self._lock = threading.Lock()
 
@@ -195,12 +196,11 @@ class DBusGridService:
     def check_connection_timeout(self) -> None:
         """Check if MQTT data is stale and mark disconnected"""
         with self._lock:
-            if time.time() - self.data.last_update > 30:
-                if self.data.connected:
-                    logger.warning("MQTT data stale, marking disconnected")
-                    self.data.connected = False
-                    self.data.status = 2
-                    self._push_to_dbus()
+            if time.time() - self.data.last_update > 30 and self.data.connected:
+                logger.warning("MQTT data stale, marking disconnected")
+                self.data.connected = False
+                self.data.status = 2
+                self._push_to_dbus()
 
 
 class MQTTHandler:
@@ -285,10 +285,8 @@ def create_pid_file(pid_path: str) -> None:
 
 def remove_pid_file(pid_path: str) -> None:
     """Remove PID file on exit"""
-    try:
+    with contextlib.suppress(Exception):
         os.remove(pid_path)
-    except Exception:
-        pass
 
 
 def main():
