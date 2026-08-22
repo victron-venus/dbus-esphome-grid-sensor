@@ -29,10 +29,15 @@ import sys
 import threading
 import time
 from dataclasses import dataclass, field
+from typing import Any
 
 import paho.mqtt.client as mqtt
 from dbus.mainloop.glib import DBusGMainLoop
 from gi.repository import GLib
+from paho.mqtt.client import DisconnectFlags
+from paho.mqtt.enums import CallbackAPIVersion
+from paho.mqtt.properties import Properties
+from paho.mqtt.reasoncodes import ReasonCode
 
 # Victron D-Bus
 try:
@@ -125,7 +130,7 @@ class DBusGridService:
 
         logger.info(f"D-Bus service registered: {self.service_name}")
 
-    def update_from_mqtt(self, topic: str, payload: dict) -> None:
+    def update_from_mqtt(self, topic: str, payload: dict[str, Any]) -> None:
         """Update internal state from MQTT message"""
         with self._lock:
             updated = False
@@ -210,7 +215,7 @@ class MQTTHandler:
         self.dbus_service = dbus_service
         self.client = mqtt.Client(
             client_id=f"dbus-grid-service-{DEVICE_INSTANCE}",
-            callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+            callback_api_version=CallbackAPIVersion.VERSION2,
         )
         self.client.on_connect = self._on_connect
         self.client.on_disconnect = self._on_disconnect
@@ -238,16 +243,30 @@ class MQTTHandler:
         else:
             logger.error(f"MQTT connection failed: {reason_code}")
 
-    def _on_disconnect(self, client, userdata, disconnect_flags, reason_code, properties):
+    def _on_disconnect(
+        self,
+        client: mqtt.Client,
+        userdata: Any,
+        disconnect_flags: DisconnectFlags,
+        reason_code: ReasonCode,
+        properties: Properties | None,
+    ) -> None:
         logger.warning(f"MQTT disconnected: {reason_code}")
         self.dbus_service.data.connected = False
         self.dbus_service.data.status = 2
         self.dbus_service._push_to_dbus()
 
-    def _on_subscribe(self, client, userdata, mid, reason_codes, properties):
+    def _on_subscribe(
+        self,
+        client: mqtt.Client,
+        userdata: Any,
+        mid: int,
+        reason_codes: list[ReasonCode],
+        properties: Properties,
+    ) -> None:
         logger.debug(f"MQTT subscribed: mid={mid}")
 
-    def _on_message(self, client, userdata, msg):
+    def _on_message(self, client: mqtt.Client, userdata: Any, msg: mqtt.MQTTMessage) -> None:
         try:
             topic = msg.topic
             payload = json.loads(msg.payload.decode())
@@ -289,14 +308,14 @@ def remove_pid_file(pid_path: str) -> None:
         os.remove(pid_path)
 
 
-def main():
+def main() -> int:
     """Main entry point"""
     logger.info("Starting dbus-grid-service")
 
     # Setup signal handlers
     shutdown = threading.Event()
 
-    def signal_handler(signum, frame):
+    def signal_handler(signum: int, frame: object) -> None:
         logger.info(f"Received signal {signum}, shutting down...")
         shutdown.set()
 
@@ -327,7 +346,7 @@ def main():
         dbus_service._push_to_dbus()
 
         # Setup periodic connection check
-        def periodic_check():
+        def periodic_check() -> None:
             dbus_service.check_connection_timeout()
             return True  # Continue timeout
 
@@ -338,7 +357,7 @@ def main():
         # Run GLib main loop
         loop = GLib.MainLoop()
 
-        def check_shutdown():
+        def check_shutdown() -> None:
             if shutdown.is_set():
                 loop.quit()
                 return False
