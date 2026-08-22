@@ -69,8 +69,9 @@ select = [
     "T20", # flake8-print
 ]
 ignore = ["E501", "B008"]
+[tool.ruff.lint.per-file-ignores]
 # Allow assert and print in tests
-per-file-ignores = { "tests/*": ["S101", "T201"] }
+"tests/*" = ["S101", "T201"]
 
 [tool.ruff.format]
 quote-style = "double"
