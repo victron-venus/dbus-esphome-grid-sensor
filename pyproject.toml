@@ -54,6 +54,7 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
+asyncio_mode = "auto"
 
 [tool.ruff]
 line-length = 100
@@ -83,9 +84,6 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 strict = true
-
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
 
 [tool.coverage.run]
 source = ["src"]
