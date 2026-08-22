@@ -101,3 +101,7 @@ exclude_lines = [
     "raise NotImplementedError",
     "if __name__ == .__main__.:",
 ]
+# Venus OS / system D-Bus libraries ship no type stubs anywhere
+[[tool.mypy.overrides]]
+module = ["dbus.*", "gi.*", "vedbus"]
+ignore_missing_imports = true

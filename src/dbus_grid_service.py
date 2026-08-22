@@ -225,7 +225,14 @@ class MQTTHandler:
         if MQTT_USERNAME:
             self.client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
 
-    def _on_connect(self, client, userdata, flags, reason_code, properties):
+    def _on_connect(
+        self,
+        client: mqtt.Client,
+        userdata: Any,
+        flags: ConnectFlags,
+        reason_code: ReasonCode,
+        properties: Properties | None,
+    ) -> None:
         if reason_code == 0:
             logger.info(f"MQTT connected to {MQTT_BROKER}:{MQTT_PORT}")
             # Subscribe to all grid sensor topics
@@ -275,7 +282,7 @@ class MQTTHandler:
             self.dbus_service.update_from_mqtt(topic, payload)
 
         except json.JSONDecodeError:
-            logger.warning(f"Invalid JSON on {msg.topic}: {msg.payload}")
+            logger.warning("Invalid JSON on %s: %r", msg.topic, msg.payload)
         except Exception as e:
             logger.error(f"Error processing MQTT message: {e}")
 
@@ -346,7 +353,7 @@ def main() -> int:
         dbus_service._push_to_dbus()
 
         # Setup periodic connection check
-        def periodic_check() -> None:
+        def periodic_check() -> bool:
             dbus_service.check_connection_timeout()
             return True  # Continue timeout
 
@@ -357,7 +364,7 @@ def main() -> int:
         # Run GLib main loop
         loop = GLib.MainLoop()
 
-        def check_shutdown() -> None:
+        def check_shutdown() -> bool:
             if shutdown.is_set():
                 loop.quit()
                 return False
