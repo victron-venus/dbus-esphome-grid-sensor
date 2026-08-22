@@ -22,13 +22,18 @@ classifiers = [
     "Topic :: System :: Hardware",
 ]
 requires-python = ">=3.11"
+# vedbus (Victron's D-Bus framework) is only installable on Venus OS devices
+# from the Victron package feed - it is not on PyPI, so it must not sit in
+# base dependencies or CI's 'pip install -e .[dev,test]' can never resolve.
 dependencies = [
     "paho-mqtt>=2.0.0",
-    "vedbus>=0.1.0",
     "python-dotenv>=1.0.0",
 ]
 
 [project.optional-dependencies]
+venus = [
+    "vedbus>=0.1.0",
+]
 dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
