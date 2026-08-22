@@ -69,9 +69,8 @@ select = [
     "T20", # flake8-print
 ]
 ignore = ["E501", "B008"]
-per-file-ignores = {
-    "tests/*": ["S101", "T201"],  # Allow assert and print in tests
-}
+# Allow assert and print in tests
+per-file-ignores = { "tests/*": ["S101", "T201"] }
 
 [tool.ruff.format]
 quote-style = "double"
