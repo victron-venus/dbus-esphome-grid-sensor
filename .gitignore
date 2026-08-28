@@ -10,4 +10,4 @@ __pycache__/
 *.egg-info/
 
 # OS
-.DS_Store
+.DS_Store*.backup
