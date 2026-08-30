@@ -23,3 +23,5 @@ repos:
   rev: v3.2.0
   hooks:
   - id: pylint
+    entry: env PYTHONPATH=src pylint
+    exclude: ^tests/

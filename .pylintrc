@@ -1,0 +1,40 @@
+[MAIN]
+jobs=1
+
+[BASIC]
+good-names=dgs,i,f,e,_,x,y
+
+[TYPECHECK]
+# Stubs inject modules that pylint can't follow (vedbus, gi.repository.GLib,
+# dbus.mainloop.glib). Suppress import-related noise.
+ignored-modules=vedbus,gi,gi.repository,gi.repository.GLib,dbus,dbus.mainloop,dbus.mainloop.glib,dbus_grid_service
+
+[MESSAGES CONTROL]
+# Style/convention nits that don't represent real bugs. The CI runs ruff for
+# real style enforcement; pylint here is the safety net for correctness only.
+disable=
+    C0116,  # missing-function-docstring
+    C0114,  # missing-module-docstring
+    C0115,  # missing-class-docstring
+    C0103,  # invalid-name
+    R0902,  # too-many-instance-attributes
+    R0913,  # too-many-arguments (paho callbacks force this)
+    R0914,  # too-many-locals
+    R0915,  # too-many-statements
+    R0801,  # duplicate-code
+    W1203,  # logging-fstring-interpolation (style preference)
+    W0718,  # broad-exception-caught (MQTT / D-Bus boundaries warrant it)
+    W0613,  # unused-argument (paho callback signatures)
+    W0212,  # protected-access (cross-class call by design)
+    W1514,  # unspecified-encoding (we want platform default)
+    # Test-file nits: stubs must import after sys.modules patches, fixtures use
+    # redefined names, lambdas intentional, stub classes have no public methods.
+    C0413,  # wrong-import-position (stubs force this ordering)
+    C0415,  # import-outside-toplevel (test uses it intentionally)
+    W0621,  # redefined-outer-name (pytest fixtures)
+    W0108,  # unnecessary-lambda (intentional small closures)
+    R0903,  # too-few-public-methods (stub/namespace classes)
+    E0401,  # unable-to-import (vedbus stubs injected at test load time)
+
+[FORMAT]
+max-line-length=100
