@@ -2,11 +2,6 @@
 # daemontools run script for dbus-grid-service
 # This file is installed to /service/dbus-grid-service/run by install.sh
 
-# Load environment configuration
-if [ -f /data/dbus-grid-service/.env ]; then
-    export $(grep -v '^#' /data/dbus-grid-service/.env | xargs)
-fi
-
 # Ensure D-Bus system bus is available
 mkdir -p /var/run/dbus
 if [ ! -S /var/run/dbus/system_bus_socket ]; then
@@ -19,4 +14,4 @@ cd /data/dbus-grid-service
 
 # Run the Python service
 # Use exec to replace shell with python process (proper daemontools behavior)
-exec python3 dbus_grid_service.py
+exec python3 service_launcher.py

@@ -328,7 +328,10 @@ last-update time unchanged. Set `MQTT_TOPIC_PREFIX` to match the firmware prefix
 Native installation requires Python 3.11+, the platform's Python D-Bus/GI bindings,
 and official Victron `velib_python` on `PYTHONPATH`. It is not a PyPI package;
 the installer checks these imports instead of requesting a nonexistent `vedbus`
-distribution. The configured `PYTHONPATH` is retained for service startup.
+distribution. The configured `PYTHONPATH` is retained for service startup. The native launcher
+reads `.env` as data: quoted names, spaces, passwords containing `#`, and literal
+`$` characters are preserved without shell evaluation or variable interpolation.
+Explicit process environment values take precedence over `.env`.
 
 ### Using install.sh (Recommended)
 
@@ -346,7 +349,7 @@ This installs:
 ```bash
 # Copy files
 mkdir -p /data/dbus-grid-service
-cp src/dbus_grid_service.py /data/dbus-grid-service/
+cp src/dbus_grid_service.py src/service_launcher.py /data/dbus-grid-service/
 cp service/run /data/dbus-grid-service/
 
 # Create daemontools service

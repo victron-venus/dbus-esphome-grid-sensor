@@ -19,6 +19,7 @@ def test_wheel_contains_runtime_module(tmp_path: Path) -> None:
     )
     wheel = ProjectBuilder(str(staging)).build("wheel", str(tmp_path / "dist"))
     with zipfile.ZipFile(wheel) as archive:
-        source = archive.read("dbus_grid_service.py")
-        assert source == (root / "src/dbus_grid_service.py").read_bytes()
-        compile(source, "dbus_grid_service.py", "exec")
+        for name in ("dbus_grid_service.py", "service_launcher.py"):
+            source = archive.read(name)
+            assert source == (root / "src" / name).read_bytes()
+            compile(source, name, "exec")

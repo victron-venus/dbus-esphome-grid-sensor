@@ -33,7 +33,7 @@ def test_systemd_generator_uses_persistent_install_directory(tmp_path: Path) -> 
     unit = (tmp_path / "dbus-grid-service.service").read_text()
     assert f"WorkingDirectory={install_dir}" in unit
     assert f"EnvironmentFile={install_dir}/.env" in unit
-    assert "ExecStart=/usr/bin/python3 dbus_grid_service.py" in unit
+    assert "ExecStart=/usr/bin/python3 service_launcher.py" in unit
     assert (tmp_path / "calls").read_text().splitlines() == [
         "daemon-reload",
         "enable dbus-grid-service",

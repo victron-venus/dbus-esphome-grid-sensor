@@ -49,7 +49,7 @@ Repository = "https://github.com/victron-venus/dbus-esphome-grid-sensor"
 Issues = "https://github.com/victron-venus/dbus-esphome-grid-sensor/issues"
 
 [tool.setuptools]
-py-modules = ["dbus_grid_service"]
+py-modules = ["dbus_grid_service", "service_launcher"]
 package-dir = {"" = "src"}
 
 [tool.pytest.ini_options]
