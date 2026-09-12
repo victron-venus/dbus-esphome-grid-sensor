@@ -1,61 +1,38 @@
-# Dockerfile for dbus-esphome-grid-sensor
-# Multi-stage build for minimal final image
-
-# Build stage
-FROM python:3.12-slim-bookworm AS builder
-
-WORKDIR /app
-
-# Install build dependencies
+FROM debian:bookworm-slim@sha256:88200866dfff7ea7f5cbcb6ec7c8a701889efe6fe859fe64d6990e4b07ea4171 AS builder
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    python3-dev \
-    libdbus-1-dev \
-    libglib2.0-dev \
+    python3 python3-venv ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-
-# Install Python dependencies
-COPY pyproject.toml .
-RUN pip install --no-cache-dir --prefix=/install .
-
-# Runtime stage
-FROM python:3.12-slim-bookworm
-
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libdbus-1-3 \
-    libglib2.0-0 \
-    dbus \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create non-root user
-RUN groupadd -r appuser && useradd -r -g appuser appuser
-
-WORKDIR /app
-
-# Copy installed packages from builder
-COPY --from=builder /install /usr/local
-
-# Copy application code
+WORKDIR /build
+COPY pyproject.toml README.md LICENSE ./
 COPY src/ ./src/
-COPY service/run ./service/run
+RUN python3 -m venv --system-site-packages /opt/venv \
+    && /opt/venv/bin/pip install --no-cache-dir .
+# Official Victron sources, with their license, pinned independently of the host.
+ADD --checksum=sha256:ad4c7501085153c7b0dd838dab531782e835d5828bf8afe0cb82e5edb0179710 \
+    https://github.com/victronenergy/velib_python/archive/17bbcd4c632d3eda484cde611dc78bf8c2ba469f.tar.gz /tmp/velib.tar.gz
+RUN mkdir /opt/velib_python \
+    && tar -xzf /tmp/velib.tar.gz --strip-components=1 -C /opt/velib_python \
+    && rm /tmp/velib.tar.gz
 
-# Create required directories
-RUN mkdir -p /var/run/dbus /run && \
-    chown -R appuser:appuser /app /var/run/dbus /run
-
-# Environment variables
-ENV PYTHONUNBUFFERED=1 \
+FROM debian:bookworm-slim@sha256:88200866dfff7ea7f5cbcb6ec7c8a701889efe6fe859fe64d6990e4b07ea4171
+# Use Debian's interpreter with its matching native GI and D-Bus bindings.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-dbus python3-gi gir1.2-glib-2.0 \
+    && rm -rf /var/lib/apt/lists/*
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /opt/velib_python /opt/velib_python
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONPATH=/opt/velib_python \
+    PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    MQTT_BROKER=mosquitto \
+    MQTT_BROKER=localhost \
     MQTT_PORT=1883 \
     DBUS_INSTANCE=42 \
     DEVICE_INSTANCE=42 \
     CUSTOM_NAME="ESPHome CT Grid Sensor"
-
-# Use host networking for D-Bus access
-# Note: Must run with --network=host and --volume=/var/run/dbus:/var/run/dbus
-
+WORKDIR /app
 USER appuser
-
+# Import only: building does not contact a broker or the host D-Bus.
+RUN python -c 'import dbus_grid_service; from vedbus import VeDbusService'
 ENTRYPOINT ["python", "-m", "dbus_grid_service"]

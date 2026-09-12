@@ -31,10 +31,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-venus = [
-    "vedbus>=0.1.0",
-]
 dev = [
+    "build>=1.2",
+    "setuptools>=68",
+    "wheel",
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.1.0",
@@ -48,9 +48,9 @@ Homepage = "https://github.com/victron-venus/dbus-esphome-grid-sensor"
 Repository = "https://github.com/victron-venus/dbus-esphome-grid-sensor"
 Issues = "https://github.com/victron-venus/dbus-esphome-grid-sensor/issues"
 
-[tool.setuptools.packages.find]
-where = ["src"]
-include = ["dbus_grid_service*"]
+[tool.setuptools]
+py-modules = ["dbus_grid_service"]
+package-dir = {"" = "src"}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

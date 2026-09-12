@@ -287,6 +287,15 @@ ADS1115 provides ~0.0625mV/LSB vs ESP32 ~0.8mV/LSB (12-bit).
 
 ## MQTT Topics
 
+The service accepts the bundled firmware's standard ESPHome scalar state messages
+(for example `grid-sensor/sensor/grid_power/state` with payload `1250`).
+The same mapping supports `grid_current`, `grid_voltage`, `grid_energy_forward`,
+`grid_energy_reverse`, and `grid_frequency` sensor names without reflashing.
+Short metric topics also accept numeric scalars or `{"value": 1250}` wrappers;
+the keyed JSON messages below remain supported. Both plain and JSON availability
+messages are accepted. Invalid or non-finite samples leave readings and their
+last-update time unchanged. Set `MQTT_TOPIC_PREFIX` to match the firmware prefix.
+
 | Topic | Payload | Description |
 |-------|---------|-------------|
 | `grid-sensor/power` | `{"power": 1250}` | AC Power (W) |
@@ -316,6 +325,11 @@ ADS1115 provides ~0.0625mV/LSB vs ESP32 ~0.8mV/LSB (12-bit).
 
 ## Installation on Venus OS
 
+Native installation requires Python 3.11+, the platform's Python D-Bus/GI bindings,
+and official Victron `velib_python` on `PYTHONPATH`. It is not a PyPI package;
+the installer checks these imports instead of requesting a nonexistent `vedbus`
+distribution. The configured `PYTHONPATH` is retained for service startup.
+
 ### Using install.sh (Recommended)
 
 ```bash
@@ -323,7 +337,7 @@ ADS1115 provides ~0.0625mV/LSB vs ESP32 ~0.8mV/LSB (12-bit).
 ```
 
 This installs:
-- D-Bus service to `/opt/victronenergy/dbus-grid-service/`
+- D-Bus service to `/data/dbus-grid-service/`
 - Daemontools service to `/service/dbus-grid-service/`
 - Systemd service (if systemd available)
 
@@ -331,20 +345,26 @@ This installs:
 
 ```bash
 # Copy files
-mkdir -p /opt/victronenergy/dbus-grid-service
-cp src/dbus_grid_service.py /opt/victronenergy/dbus-grid-service/
-cp service/run /opt/victronenergy/dbus-grid-service/
+mkdir -p /data/dbus-grid-service
+cp src/dbus_grid_service.py /data/dbus-grid-service/
+cp service/run /data/dbus-grid-service/
 
 # Create daemontools service
 mkdir -p /service/dbus-grid-service
-ln -s /opt/victronenergy/dbus-grid-service/run /service/dbus-grid-service/run
+ln -s /data/dbus-grid-service/run /service/dbus-grid-service/run
 
 # Or systemd
-cp service/dbus-grid-service.service /etc/systemd/system/
-systemctl enable --now dbus-grid-service
+./install.sh --systemd
 ```
 
 ## Docker Deployment
+
+The image installs the actual Python module, matching native GI/D-Bus bindings,
+and a checksum-verified revision of official Victron `velib_python` with its license.
+It does not require a sibling helper checkout. A reachable MQTT broker and access
+to the host Venus OS system D-Bus are still required; building the image does not
+connect to either. The host-network example uses `localhost` for a broker published
+on the host, since Compose service-name DNS is unavailable with host networking.
 
 ```yaml
 # docker-compose.yml
@@ -352,7 +372,7 @@ services:
   dbus-grid-service:
     build: .
     environment:
-      - MQTT_BROKER=mosquitto
+      - MQTT_BROKER=localhost
       - MQTT_PORT=1883
       - DBUS_INSTANCE=42
       - DEVICE_INSTANCE=42

@@ -29,7 +29,7 @@ services:
       dockerfile: Dockerfile
     container_name: dbus-grid-service
     environment:
-      - MQTT_BROKER=mosquitto
+      - MQTT_BROKER=localhost
       - MQTT_PORT=1883
       - MQTT_USERNAME=${MQTT_USERNAME:-}
       - MQTT_PASSWORD=${MQTT_PASSWORD:-}
