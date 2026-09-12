@@ -1,0 +1,21 @@
+name: Container contract
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Build the real runtime image
+        run: docker build --tag grid-sensor:test .
+      - name: Verify installed module and native imports without network access
+        run: >-
+          docker run --rm --network none --entrypoint python grid-sensor:test
+          -c 'import dbus_grid_service, dbus, gi; from vedbus import VeDbusService;
+          assert "/opt/venv/" in dbus_grid_service.__file__;
+          assert callable(VeDbusService)'

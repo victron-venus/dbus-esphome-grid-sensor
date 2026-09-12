@@ -23,6 +23,7 @@ D-Bus Paths (com.victronenergy.grid):
 import contextlib
 import json
 import logging
+import math
 import os
 import signal
 import sys
@@ -41,9 +42,9 @@ from paho.mqtt.reasoncodes import ReasonCode
 
 # Victron D-Bus
 try:
-    from vedbus import VeDBusService
+    from vedbus import VeDbusService
 except ImportError:
-    sys.stderr.write("Error: vedbus not installed. Install with: pip install vedbus\n")
+    sys.stderr.write("Error: install Victron velib_python and add its directory to PYTHONPATH.\n")
     sys.exit(1)
 
 
@@ -83,6 +84,39 @@ class GridData:
     connected: bool = False
 
 
+def normalize_payload(topic: str, payload: object) -> dict[str, Any]:
+    """Normalize and validate a complete MQTT sample before updating retained state."""
+    prefix = MQTT_TOPIC_PREFIX.rstrip("/") + "/"
+    if not topic.startswith(prefix):
+        return {}
+    suffix = topic[len(prefix) :]
+    metrics = ("power", "voltage", "current", "energy_forward", "energy_reverse", "frequency")
+    metric = next((name for name in metrics if suffix in (name, f"sensor/grid_{name}/state")), None)
+    if metric is not None and not isinstance(payload, dict):
+        payload = {metric: payload}
+    elif metric is not None and isinstance(payload, dict) and "value" in payload:
+        payload = {metric: payload["value"]}
+    elif suffix == "status" and isinstance(payload, str):
+        payload = {"status": payload}
+    if not isinstance(payload, dict):
+        return {}
+    # Validate the whole sample before modifying any retained readings.
+    values: dict[str, Any] = {}
+    for name in metrics:
+        if name in payload:
+            if isinstance(payload[name], bool):
+                raise ValueError("Boolean sensor value")
+            value = float(payload[name])
+            if not math.isfinite(value):
+                raise ValueError("Non-finite sensor value")
+            values[name] = value
+    if "status" in payload:
+        if payload["status"] not in ("online", "offline"):
+            raise ValueError("Unknown sensor availability")
+        values["status"] = payload["status"]
+    return values
+
+
 class DBusGridService:
     """D-Bus service registrating as Victron grid meter"""
 
@@ -91,7 +125,7 @@ class DBusGridService:
         self.device_instance = device_instance
         self.custom_name = custom_name
         self.data = GridData()
-        self.dbus_service: VeDBusService | None = None
+        self.dbus_service: VeDbusService | None = None
         self.running = False
         self._lock = threading.Lock()
 
@@ -99,7 +133,7 @@ class DBusGridService:
         """Initialize D-Bus service with all required paths"""
         DBusGMainLoop(set_as_default=True)
 
-        self.dbus_service = VeDBusService(self.service_name)
+        self.dbus_service = VeDbusService(self.service_name)
 
         # Management paths
         self.dbus_service.add_path("/Mgmt/ProcessName", "dbus-grid-service")
@@ -130,8 +164,9 @@ class DBusGridService:
 
         logger.info(f"D-Bus service registered: {self.service_name}")
 
-    def update_from_mqtt(self, topic: str, payload: dict[str, Any]) -> None:
-        """Update internal state from MQTT message"""
+    def update_from_mqtt(self, topic: str, payload: object) -> None:
+        """Accept keyed JSON and ESPHome numeric state messages under our prefix."""
+        payload = normalize_payload(topic, payload)
         with self._lock:
             updated = False
 
@@ -276,7 +311,8 @@ class MQTTHandler:
     def _on_message(self, client: mqtt.Client, userdata: Any, msg: mqtt.MQTTMessage) -> None:
         try:
             topic = msg.topic
-            payload = json.loads(msg.payload.decode())
+            text = msg.payload.decode()
+            payload = text if text in ("online", "offline") else json.loads(text)
 
             logger.debug(f"MQTT: {topic} = {payload}")
             self.dbus_service.update_from_mqtt(topic, payload)

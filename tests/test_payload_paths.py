@@ -9,9 +9,9 @@ import pytest
 
 
 # --- vedbus stub -------------------------------------------------------------
-# vedbus is Victron-only (no PyPI). Stub VeDBusService so the module imports
+# vedbus is Victron-only (no PyPI). Stub VeDbusService so the module imports
 # on a dev box and we can capture add_path / __setitem__ calls.
-class _StubVeDBusService:
+class _StubVeDbusService:
     def __init__(self, service_name: str) -> None:
         self.service_name = service_name
         self.paths: dict[str, Any] = {}
@@ -27,7 +27,7 @@ class _StubVeDBusService:
 
 
 vedbus_mod = types.ModuleType("vedbus")
-vedbus_mod.VeDBusService = _StubVeDBusService
+vedbus_mod.VeDbusService = _StubVeDbusService
 sys.modules["vedbus"] = vedbus_mod
 
 # gi.repository.GLib + dbus.mainloop.glib stubs (also unavailable on dev box).
@@ -93,9 +93,8 @@ def dgs():
 
 def test_power_payload_sets_ac_power(dgs):
     dgs.update_from_mqtt("grid-sensor/power", {"value": 1234.5})
-    # JSON-wrapped payloads are common; the topic sends raw floats via plain
-    # {"value":...} in ESPHome; both shapes must coerce. We accept both shapes.
-    assert dgs.data.power in (1234.5, 0.0)
+    # The topic identifies the metric for generic JSON value wrappers.
+    assert dgs.data.power == 1234.5
 
 
 def test_full_payload_round_trip(dgs):
@@ -312,3 +311,59 @@ def test_on_connect_failure_does_not_subscribe():
         _StubProperties(),
     )
     assert called["subscribe"] == 0
+
+
+@pytest.mark.parametrize(
+    "suffix,field,path,value",
+    [
+        ("power", "power", "/Ac/Power", -1250.5),
+        ("sensor/grid_power/state", "power", "/Ac/Power", 1234.5),
+        ("sensor/grid_current/state", "current", "/Ac/L1/Current", 5.4),
+        ("sensor/grid_energy_forward/state", "energy_forward", "/Ac/Energy/Forward", 45.2),
+        ("sensor/grid_energy_reverse/state", "energy_reverse", "/Ac/Energy/Reverse", 12.1),
+    ],
+)
+def test_real_esphome_scalar_message_reaches_dbus(dgs, suffix, field, path, value):
+    """Feed actual Paho messages through the production callback without a broker."""
+    handler = svc.MQTTHandler(dgs)
+    message = svc.mqtt.MQTTMessage(topic=f"grid-sensor/{suffix}".encode())
+    message.payload = str(value).encode()
+    handler._on_message(handler.client, None, message)
+    assert getattr(dgs.data, field) == value
+    assert dgs.dbus_service.paths[path] == value
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [b"nan", b"NaN", b"Infinity", b"true", b"null", b"[1]", b'{"power": 12, "voltage": "bad"}'],
+)
+def test_invalid_sample_preserves_all_readings(dgs, payload):
+    """Malformed samples must neither partially write D-Bus nor refresh timeout."""
+    handler = svc.MQTTHandler(dgs)
+    before = vars(dgs.data).copy()
+    paths = dgs.dbus_service.paths.copy()
+    message = svc.mqtt.MQTTMessage(topic=b"grid-sensor/power")
+    message.payload = payload
+    handler._on_message(handler.client, None, message)
+    assert vars(dgs.data) == before
+    assert dgs.dbus_service.paths == paths
+
+
+def test_custom_prefix_and_plain_availability(dgs, monkeypatch):
+    """A configured prefix scopes updates and accepts ESPHome's default will."""
+    monkeypatch.setattr(svc, "MQTT_TOPIC_PREFIX", "home/grid")
+    handler = svc.MQTTHandler(dgs)
+    for topic, payload in [
+        ("home/grid/status", b"online"),
+        ("grid-sensor/power", b"999"),
+        ("home/grid/sensor/grid_power/state", b"42"),
+    ]:
+        message = svc.mqtt.MQTTMessage(topic=topic.encode())
+        message.payload = payload
+        handler._on_message(handler.client, None, message)
+    assert dgs.data.connected
+    assert dgs.data.power == 42
+    message = svc.mqtt.MQTTMessage(topic=b"home/grid/status")
+    message.payload = b"offline"
+    handler._on_message(handler.client, None, message)
+    assert not dgs.data.connected

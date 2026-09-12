@@ -84,7 +84,13 @@ install_dependencies() {
     fi
 
     # Install Python packages
-    pip3 install --no-cache-dir paho-mqtt vedbus python-dotenv
+    pip3 install --no-cache-dir 'paho-mqtt>=2.0.0' python-dotenv
+
+    # These native libraries and official Victron sources are not PyPI packages.
+    if ! python3 -c 'from dbus.mainloop.glib import DBusGMainLoop; from gi.repository import GLib; from vedbus import VeDbusService'; then
+        log_error "Install the platform D-Bus/GI bindings and set PYTHONPATH to official velib_python before installation"
+        return 1
+    fi
 }
 
 create_install_dir() {
@@ -114,6 +120,7 @@ MQTT_TOPIC_PREFIX=$MQTT_TOPIC_PREFIX
 DBUS_INSTANCE=$DBUS_INSTANCE
 DEVICE_INSTANCE=$DEVICE_INSTANCE
 CUSTOM_NAME=$CUSTOM_NAME
+PYTHONPATH=${PYTHONPATH:-}
 RECONNECT_DELAY=$RECONNECT_DELAY
 EOF
 
@@ -209,8 +216,8 @@ Wants=network.target dbus.service
 
 [Service]
 Type=simple
-EnvironmentFile=/opt/victronenergy/dbus-grid-service/.env
-WorkingDirectory=/opt/victronenergy/dbus-grid-service
+EnvironmentFile=$INSTALL_DIR/.env
+WorkingDirectory=$INSTALL_DIR
 ExecStart=/usr/bin/python3 dbus_grid_service.py
 Restart=on-failure
 RestartSec=5
