@@ -223,7 +223,7 @@ docker compose up -d
 
 Check D-Bus:
 ```bash
-dbus-spy com.victronenergy.grid.42
+dbus-spy com.victronenergy.grid.esphome_42
 ```
 
 Or via MQTT:
@@ -344,21 +344,25 @@ This installs:
 - Daemontools service to `/service/dbus-grid-service/`
 - Systemd service (if systemd available)
 
-### Manual Installation
+### Installation without starting the meter
 
-```bash
-# Copy files
-mkdir -p /data/dbus-grid-service
-cp src/dbus_grid_service.py src/service_launcher.py /data/dbus-grid-service/
-cp service/run /data/dbus-grid-service/
-
-# Create daemontools service
-mkdir -p /service/dbus-grid-service
-ln -s /data/dbus-grid-service/run /service/dbus-grid-service/run
-
-# Or systemd
-./install.sh --systemd
+```sh
+./install.sh --skip-start
+# Review /data/dbus-grid-service/.env, then enable the service:
+rm /data/dbus-grid-service/service/dbus-grid-service/down
+svc -u /service/dbus-grid-service
 ```
+
+The installer verifies platform libraries, including paho-mqtt 2.x, without
+modifying global Python packages. The native launcher uses only the standard
+library and retains compatibility with existing quoted dotenv settings. Existing `.env` files
+are preserved and restricted to root. It uses native `multilog` with four
+rotated 25 KB files plus the current file, captures stdout and stderr, and
+restores the `/service` link before an existing `exit 0` in `/data/rc.local`.
+Upgrades preserve service, log and supervisor directory inodes and replace only
+launcher files. Legacy service directories move intact to persistent storage.
+The service waits for the firmware's D-Bus; it never starts another
+system bus. `--systemd` remains available for hosts running systemd.
 
 ## Docker Deployment
 
@@ -435,3 +439,14 @@ MIT License - see [LICENSE](LICENSE) for details.
 - [inverter-dashboard-go](https://github.com/victron-venus/inverter-dashboard-go) - Real-time web dashboard
 - [dbus-mqtt-battery](https://github.com/victron-venus/dbus-mqtt-battery) - BMS D-Bus integration
 - [venus-os-observability](https://github.com/victron-venus/venus-os-observability) - OpenTelemetry monitoring
+
+## Meter validity on Venus OS
+
+The default bus name is `com.victronenergy.grid.esphome_42`; a name component
+cannot begin with a digit. All required paths are created before name
+registration. MQTT callbacks hand updates to the GLib thread and subscribe once
+to the topic prefix. A power sample establishes freshness. Availability and
+energy-counter messages cannot keep an old power value online. After 30 seconds
+without valid power, instantaneous measurements become invalid and `/Connected`
+becomes zero. A new valid power sample restores the meter. Broker reconnection
+is asynchronous and does not prevent the D-Bus loop from running.

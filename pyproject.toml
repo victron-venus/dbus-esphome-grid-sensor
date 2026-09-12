@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dbus-esphome-grid-sensor"
-version = "1.0.1"
+version = "1.0.2"
 description = "ESP32 CT Grid Sensor with D-Bus service for Victron Venus OS"
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -27,11 +27,11 @@ requires-python = ">=3.11"
 # base dependencies or CI's 'pip install -e .[dev,test]' can never resolve.
 dependencies = [
     "paho-mqtt>=2.0.0",
-    "python-dotenv>=1.0.0",
 ]
 
 [project.optional-dependencies]
 dev = [
+    "python-dotenv>=1.0.0",  # Compatibility checks for existing configuration files
     "build>=1.2",
     "setuptools>=68",
     "wheel",

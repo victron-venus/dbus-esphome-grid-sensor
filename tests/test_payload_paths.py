@@ -12,9 +12,16 @@ import pytest
 # vedbus is Victron-only (no PyPI). Stub VeDbusService so the module imports
 # on a dev box and we can capture add_path / __setitem__ calls.
 class _StubVeDbusService:
-    def __init__(self, service_name: str) -> None:
+    def __init__(self, service_name: str, register: bool = True) -> None:
         self.service_name = service_name
+        assert register is False
+        self.registered = False
         self.paths: dict[str, Any] = {}
+
+    def register(self) -> None:
+        assert "/DeviceInstance" in self.paths
+        assert "/Ac/Power" in self.paths
+        self.registered = True
 
     def add_path(self, path: str, value: Any, writeable: bool = False) -> None:
         self.paths[path] = value
@@ -46,6 +53,7 @@ class _MainLoop:
         pass
 
 
+glib_mod.idle_add = lambda callback, *args: callback(*args)
 glib_mod.timeout_add_seconds = _noop
 glib_mod.timeout_add = _noop
 glib_mod.MainLoop = _MainLoop
@@ -93,8 +101,10 @@ def dgs():
 
 def test_power_payload_sets_ac_power(dgs):
     dgs.update_from_mqtt("grid-sensor/power", {"value": 1234.5})
-    # The topic identifies the metric for generic JSON value wrappers.
+    # JSON-wrapped payloads are common; the topic sends raw floats via plain
+    # {"value":...} in ESPHome; both shapes must coerce. We accept both shapes.
     assert dgs.data.power == 1234.5
+    assert dgs.dbus_service.paths["/Ac/Power"] == 1234.5
 
 
 def test_full_payload_round_trip(dgs):
@@ -186,11 +196,11 @@ def test_setup_registers_mandatory_victron_paths(dgs):
 def test_check_connection_timeout_marks_stale(dgs, monkeypatch):
     import time as _time
 
-    dgs.update_from_mqtt("grid-sensor/status", {"status": "online"})
+    dgs.update_from_mqtt("grid-sensor/state", {"power": 10, "status": "online"})
     assert dgs.data.connected is True
 
     # Move last_update into the past (>30s)
-    dgs.data.last_update = _time.time() - 60
+    dgs.data.last_update = _time.monotonic() - 60
     dgs.check_connection_timeout()
     assert dgs.data.connected is False
     assert dgs.data.status == 2
@@ -280,14 +290,7 @@ def test_on_connect_subscribes_to_all_grid_topics():
         _StubProperties(),
     )
     flat = [t for sub in recorder.subscribed for (t, _qos) in sub]
-    assert "grid-sensor/power" in flat
-    assert "grid-sensor/voltage" in flat
-    assert "grid-sensor/current" in flat
-    assert "grid-sensor/energy_forward" in flat
-    assert "grid-sensor/energy_reverse" in flat
-    assert "grid-sensor/frequency" in flat
-    assert "grid-sensor/status" in flat
-    assert "grid-sensor/#" in flat
+    assert flat == ["grid-sensor/#"]
 
 
 def test_on_connect_failure_does_not_subscribe():
@@ -313,6 +316,61 @@ def test_on_connect_failure_does_not_subscribe():
     assert called["subscribe"] == 0
 
 
+@pytest.mark.parametrize("payload", [123.5, {"value": 123.5}, {"power": 123.5}])
+def test_topic_payload_variants(dgs, payload):
+    dgs.update_from_mqtt("grid-sensor/power", payload)
+    assert dgs.dbus_service.paths["/Ac/Power"] == 123.5
+    assert dgs.dbus_service.paths["/Connected"] == 1
+
+
+def test_esphome_native_sensor_topic(dgs):
+    dgs.update_from_mqtt("grid-sensor/sensor/grid_power/state", 42.0)
+    assert dgs.dbus_service.paths["/Ac/Power"] == 42.0
+
+
+def test_online_and_energy_do_not_refresh_stale_power(dgs):
+    dgs.update_from_mqtt("grid-sensor/power", 42.0)
+    dgs.data.last_update -= 60
+    dgs.update_from_mqtt("grid-sensor/status", "online")
+    dgs.update_from_mqtt("grid-sensor/energy_forward", 100.0)
+    dgs.check_connection_timeout()
+    assert dgs.dbus_service.paths["/Connected"] == 0
+    assert dgs.dbus_service.paths["/Ac/Power"] is None
+    dgs.update_from_mqtt("grid-sensor/power", 43.0)
+    assert dgs.dbus_service.paths["/Connected"] == 1
+    assert dgs.dbus_service.paths["/Ac/Power"] == 43.0
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), "unknown", None])
+def test_invalid_measurements_do_not_mutate_data(dgs, value):
+    before = dgs.data.last_update
+    with pytest.raises((ValueError, TypeError)):
+        dgs.update_from_mqtt("grid-sensor/state", {"power": 123, "voltage": value})
+    assert dgs.data.power == 0.0
+    assert dgs.data.last_update == before
+
+
+def test_mqtt_defers_dbus_writes_until_glib_callback(dgs, monkeypatch):
+    pending = []
+    monkeypatch.setattr(
+        svc.GLib, "idle_add", lambda callback, *args: pending.append((callback, args))
+    )
+    handler = svc.MQTTHandler(dgs)
+    handler._on_message(None, None, _mqtt_message("grid-sensor/power", 42.0))
+    assert dgs.data.power == 0.0
+    callback, args = pending.pop()
+    assert callback(*args) is False
+    assert dgs.dbus_service.paths["/Ac/Power"] == 42.0
+
+
+def test_startup_registers_invalid_measurements_until_power_arrives(dgs):
+    assert dgs.dbus_service.registered
+    assert dgs.dbus_service.paths["/Ac/Power"] is None
+    dgs.update_from_mqtt("grid-sensor/status", "online")
+    assert dgs.dbus_service.paths["/Connected"] == 0
+    assert svc.DBUS_SERVICE_NAME == "com.victronenergy.grid.esphome_42"
+
+
 @pytest.mark.parametrize(
     "suffix,field,path,value",
     [
@@ -325,6 +383,7 @@ def test_on_connect_failure_does_not_subscribe():
 )
 def test_real_esphome_scalar_message_reaches_dbus(dgs, suffix, field, path, value):
     """Feed actual Paho messages through the production callback without a broker."""
+    dgs.update_from_mqtt("grid-sensor/power", 1.0)
     handler = svc.MQTTHandler(dgs)
     message = svc.mqtt.MQTTMessage(topic=f"grid-sensor/{suffix}".encode())
     message.payload = str(value).encode()
