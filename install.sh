@@ -83,7 +83,6 @@ from dbus.mainloop.glib import DBusGMainLoop
 from gi.repository import GLib
 from vedbus import VeDbusService
 from paho.mqtt.enums import CallbackAPIVersion
-from dotenv import dotenv_values
 PYDEPS
 }
 
@@ -112,14 +111,16 @@ copy_files() {
     DEVICE_INSTANCE="$DEVICE_INSTANCE" CUSTOM_NAME="$CUSTOM_NAME" \
     PYTHONPATH="${PYTHONPATH:-}" RECONNECT_DELAY="$RECONNECT_DELAY" \
     python3 - "$INSTALL_DIR/.env" <<'PYENV'
+import json
 import os
 import sys
-from dotenv import set_key
 
-for key in ("MQTT_BROKER", "MQTT_PORT", "MQTT_USERNAME", "MQTT_PASSWORD",
-            "MQTT_TOPIC_PREFIX", "DBUS_INSTANCE", "DEVICE_INSTANCE", "CUSTOM_NAME",
-            "PYTHONPATH", "RECONNECT_DELAY"):
-    set_key(sys.argv[1], key, os.environ[key], quote_mode="always")
+keys = ("MQTT_BROKER", "MQTT_PORT", "MQTT_USERNAME", "MQTT_PASSWORD",
+        "MQTT_TOPIC_PREFIX", "DBUS_INSTANCE", "DEVICE_INSTANCE", "CUSTOM_NAME",
+        "PYTHONPATH", "RECONNECT_DELAY")
+with open(sys.argv[1], "w", encoding="utf-8") as config:
+    for key in keys:
+        config.write(key + "=" + json.dumps(os.environ[key], ensure_ascii=False) + "\n")
 PYENV
     fi
     chmod 600 "$INSTALL_DIR/.env"

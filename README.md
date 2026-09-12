@@ -353,8 +353,9 @@ rm /data/dbus-grid-service/service/dbus-grid-service/down
 svc -u /service/dbus-grid-service
 ```
 
-The installer verifies platform libraries, including paho-mqtt 2.x and
-python-dotenv, without modifying global Python packages. Existing `.env` files
+The installer verifies platform libraries, including paho-mqtt 2.x, without
+modifying global Python packages. The native launcher uses only the standard
+library and retains compatibility with existing quoted dotenv settings. Existing `.env` files
 are preserved and restricted to root. It uses native `multilog` with four
 rotated 25 KB files plus the current file, captures stdout and stderr, and
 restores the `/service` link before an existing `exit 0` in `/data/rc.local`.

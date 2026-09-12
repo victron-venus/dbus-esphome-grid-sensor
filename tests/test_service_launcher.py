@@ -84,3 +84,31 @@ def test_installer_copies_launcher_and_round_trips_literal_values(tmp_path):
     assert dotenv_values(tmp_path / ".env", interpolate=False) == values
     for name in ("dbus_grid_service.py", "service_launcher.py"):
         assert (tmp_path / name).read_bytes() == (root / "src" / name).read_bytes()
+
+
+def test_standard_library_reader_handles_installer_json_and_legacy_quotes(tmp_path):
+    """Both the old writer and the new writer preserve literal secrets and newlines."""
+    import json
+
+    from service_launcher import read_settings
+
+    values = {
+        "CUSTOM_NAME": "Grid room 'one' \"two\" #3",
+        "MQTT_PASSWORD": "a\\b\\n $HOME ${USER} # `cmd` ' \"\nnext line",
+        "EMPTY": "",
+    }
+    path = tmp_path / ".env"
+    for key, value in values.items():
+        set_key(path, key, value, quote_mode="always")
+    assert read_settings(path) == values
+    path.write_text("\n".join(key + "=" + json.dumps(value) for key, value in values.items()))
+    assert read_settings(path) == values
+
+
+def test_reader_preserves_multiline_spaces_and_ignores_quoted_comments(tmp_path):
+    """Spaces inside quotes are data, while quotes inside comments are ignored."""
+    from service_launcher import read_settings
+
+    path = tmp_path / ".env"
+    path.write_text('CUSTOM_NAME="first \n second " # comment "with quotes"\n')
+    assert read_settings(path) == {"CUSTOM_NAME": "first \n second "}
