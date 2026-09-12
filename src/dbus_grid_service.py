@@ -48,6 +48,8 @@ except ImportError:
     sys.exit(1)
 
 
+VERSION = "1.0.1"
+
 # Configuration from environment
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
@@ -142,7 +144,7 @@ class DBusGridService:
 
         # Management paths
         self.dbus_service.add_path("/Mgmt/ProcessName", "dbus-grid-service")
-        self.dbus_service.add_path("/Mgmt/ProcessVersion", "1.0.0")
+        self.dbus_service.add_path("/Mgmt/ProcessVersion", VERSION)
         self.dbus_service.add_path("/Mgmt/Connection", "MQTT")
 
         # Device info
@@ -150,7 +152,7 @@ class DBusGridService:
         self.dbus_service.add_path("/ProductId", 0xFFFF)
         self.dbus_service.add_path("/ProductName", self.custom_name)
         self.dbus_service.add_path("/CustomName", self.custom_name)
-        self.dbus_service.add_path("/FirmwareVersion", "1.0")
+        self.dbus_service.add_path("/FirmwareVersion", VERSION)
         self.dbus_service.add_path("/HardwareVersion", "ESP32-SCT013")
         self.dbus_service.add_path("/Connected", 0)
 

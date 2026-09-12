@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dbus-esphome-grid-sensor"
-version = "1.0.0"
+version = "1.0.1"
 description = "ESP32 CT Grid Sensor with D-Bus service for Victron Venus OS"
 readme = "README.md"
 license = {file = "LICENSE"}

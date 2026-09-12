@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-09-12
+
+### Fixed
+- Accept standard ESPHome scalar state topics while preserving keyed JSON telemetry.
+- Reject invalid samples without partially updating readings or their freshness.
+- Include the executable service modules in Python distributions and the native D-Bus/GI runtime in Docker.
+- Use the official Victron library API and persistent native service paths.
+- Preserve spaces, quotes and literal special characters in native `.env` configuration.
+
+The ESPHome firmware is unchanged. Native installations still require platform
+D-Bus/GI bindings and official `velib_python` on `PYTHONPATH`; the Docker image
+includes those runtime dependencies. Wheel and source distribution assets include
+SHA256 checksums.
+
 ## [1.0.0] - 2026-08-10
 
 ### Added
