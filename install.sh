@@ -75,22 +75,16 @@ check_python() {
 }
 
 install_dependencies() {
-    log_info "Installing Python dependencies..."
-
-    # Venus OS uses opkg for package management
-    if command -v opkg &> /dev/null; then
-        opkg update
-        opkg install python3-pip python3-setuptools
-    fi
-
-    # Install Python packages
-    pip3 install --no-cache-dir 'paho-mqtt>=2.0.0' python-dotenv
-
-    # These native libraries and official Victron sources are not PyPI packages.
-    if ! python3 -c 'from dbus.mainloop.glib import DBusGMainLoop; from gi.repository import GLib; from vedbus import VeDbusService'; then
-        log_error "Install the platform D-Bus/GI bindings and set PYTHONPATH to official velib_python before installation"
-        return 1
-    fi
+    log_info "Verifying platform Python dependencies (no global package upgrades)..."
+    python3 - <<'PYDEPS'
+import sys
+sys.path.insert(0, '/opt/victronenergy/dbus-systemcalc-py/ext/velib_python')
+from dbus.mainloop.glib import DBusGMainLoop
+from gi.repository import GLib
+from vedbus import VeDbusService
+from paho.mqtt.enums import CallbackAPIVersion
+from dotenv import dotenv_values
+PYDEPS
 }
 
 create_install_dir() {
@@ -109,6 +103,8 @@ copy_files() {
 
     cp "$SCRIPT_DIR/src/service_launcher.py" "$INSTALL_DIR/"
 
+    # Preserve existing settings during upgrades.
+    if [ ! -f "$INSTALL_DIR/.env" ]; then
     # Keep spaces, quotes and shell-like characters as literal configuration.
     MQTT_BROKER="$MQTT_BROKER" MQTT_PORT="$MQTT_PORT" \
     MQTT_USERNAME="$MQTT_USERNAME" MQTT_PASSWORD="$MQTT_PASSWORD" \
@@ -125,6 +121,8 @@ for key in ("MQTT_BROKER", "MQTT_PORT", "MQTT_USERNAME", "MQTT_PASSWORD",
             "PYTHONPATH", "RECONNECT_DELAY"):
     set_key(sys.argv[1], key, os.environ[key], quote_mode="always")
 PYENV
+    fi
+    chmod 600 "$INSTALL_DIR/.env"
 
     log_success "Configuration written to $INSTALL_DIR/.env"
 }
@@ -132,18 +130,18 @@ PYENV
 create_daemontools_service() {
     log_info "Creating daemontools service at $SERVICE_DATA_DIR..."
 
-    mkdir -p "$SERVICE_DATA_DIR/log"
+    local staging
+    staging=$(mktemp -d "$INSTALL_DIR/service-stage.XXXXXX")
+    mkdir -p "$staging/log"
 
     # Create run script
-    cat > "$SERVICE_DATA_DIR/run" <<EOF
+    cat > "$staging/run" <<EOF
 #!/bin/sh
 # daemontools run script for dbus-grid-service
+exec 2>&1
 
-# Ensure D-Bus is running
-mkdir -p /var/run/dbus
-if [ ! -S /var/run/dbus/system_bus_socket ]; then
-    dbus-daemon --system --fork
-fi
+# The firmware owns the system bus. Retry safely while it starts.
+[ -S /var/run/dbus/system_bus_socket ] || { sleep 5; exit 1; }
 
 # Change to install directory
 cd $INSTALL_DIR || exit 1
@@ -152,52 +150,47 @@ cd $INSTALL_DIR || exit 1
 exec python3 service_launcher.py
 EOF
 
-    chmod +x "$SERVICE_DATA_DIR/run"
+    chmod +x "$staging/run"
 
     # Log pair (multilog — svlogd does not exist on Venus OS)
-    cat > "$SERVICE_DATA_DIR/log/run" <<'EOF'
+    cat > "$staging/log/run" <<'EOF'
 #!/bin/sh
 exec 2>&1
-exec multilog t s16777215 n10 /var/log/dbus-grid-service
+mkdir -p /var/log/dbus-grid-service
+exec multilog t s25000 n4 /var/log/dbus-grid-service
 EOF
-    chmod +x "$SERVICE_DATA_DIR/log/run"
+    chmod +x "$staging/log/run"
 
-    # Replace any pre-existing /service entry: a real directory there would
-    # block ln -sf (it nests inside) and dies on reboot since /service is tmpfs
-    if [[ -d "$SERVICE_DIR" && ! -L "$SERVICE_DIR" ]]; then
-        log_warning "Replacing legacy service directory at $SERVICE_DIR..."
-        mv "$SERVICE_DIR" "${SERVICE_DIR}.old.$(date +%s)"
-    fi
-
-    # svscan caches each /service entry by inode and never re-evaluates whether
-    # a log pair exists; stop old supervision and swap in a fresh-inode copy so
-    # a full main+log pair gets created
-    svc -dx "$SERVICE_DIR" 2>/dev/null || true
+    # Stop both supervisors and stage only scripts, never live FIFO/lock files.
+    svc -dx "$SERVICE_DIR" "$SERVICE_DIR/log" 2>/dev/null || true
     sleep 1
-    cp -a "$SERVICE_DATA_DIR" "${SERVICE_DATA_DIR}.new"
-    mv "$SERVICE_DATA_DIR" "${SERVICE_DATA_DIR}.old"
-    mv "${SERVICE_DATA_DIR}.new" "$SERVICE_DATA_DIR"
-    find "${SERVICE_DATA_DIR}.old" -delete 2>/dev/null || true
-
+    if [[ -d "$SERVICE_DIR" && ! -L "$SERVICE_DIR" ]]; then
+        mv "$SERVICE_DIR" "$INSTALL_DIR/legacy-service.$(date +%s)"
+    fi
+    mkdir -p "$(dirname "$SERVICE_DATA_DIR")"
+    if [ -d "$SERVICE_DATA_DIR" ]; then
+        mv "$SERVICE_DATA_DIR" "$INSTALL_DIR/previous-service.$(date +%s)"
+    fi
+    [ "$SKIP_START" = false ] || touch "$staging/down"
+    mv "$staging" "$SERVICE_DATA_DIR"
     ln -sfn "$SERVICE_DATA_DIR" "$SERVICE_DIR"
-
-    # Boot persistence: /service is tmpfs, rc.local recreates the symlink
-    local rc_local="/data/rc.local"
-    if [ ! -f "$rc_local" ]; then
-        echo "#!/bin/sh" > "$rc_local"
-        chmod +x "$rc_local"
-    fi
-    if ! grep -q "dbus-grid-service" "$rc_local" 2>/dev/null; then
-        cat >> "$rc_local" <<'EOF'
-
-# === dbus-grid-service persistence ===
+    cat > "$INSTALL_DIR/boot.sh" <<'BOOT'
+#!/bin/sh
+[ -x /data/dbus-grid-service/service/dbus-grid-service/run ] || exit 0
 ln -sfn /data/dbus-grid-service/service/dbus-grid-service /service/dbus-grid-service
-sleep 2
-svc -u /service/dbus-grid-service 2>/dev/null || true
-# === end dbus-grid-service ===
-EOF
-        log_success "Added rc.local boot persistence block"
-    fi
+BOOT
+    chmod +x "$INSTALL_DIR/boot.sh"
+    python3 - <<'PYBOOT'
+from pathlib import Path
+path = Path('/data/rc.local')
+lines = path.read_text().splitlines() if path.exists() else ['#!/bin/sh']
+command = '/data/dbus-grid-service/boot.sh'
+lines = [line for line in lines if line != command]
+index = next((i for i, line in enumerate(lines) if line.strip() == 'exit 0'), len(lines))
+lines.insert(index, command)
+path.write_text('\n'.join(lines) + '\n')
+path.chmod(path.stat().st_mode | 0o111)
+PYBOOT
 
     log_success "daemontools service created at $SERVICE_DIR -> $SERVICE_DATA_DIR"
 }
@@ -277,6 +270,11 @@ start_service() {
 
     # Try daemontools first (Venus OS standard)
     if command -v svc &> /dev/null && [[ -d "$SERVICE_DIR" ]]; then
+        local attempts=0
+        until [ -p "$SERVICE_DIR/supervise/ok" ] || [ "$attempts" -ge 15 ]; do
+            sleep 1
+            attempts=$((attempts + 1))
+        done
         svc -u "$SERVICE_DIR"
         sleep 2
         if svstat "$SERVICE_DIR" | grep -q "up"; then
@@ -346,14 +344,13 @@ main() {
     check_python
 
     # Parse command line arguments
-    SKIP_DEPS=false
     SKIP_START=false
     USE_SYSTEMD=false
 
     while [[ $# -gt 0 ]]; do
         case $1 in
             --skip-deps)
-                SKIP_DEPS=true
+                log_info "Platform dependencies are verified without installation"
                 shift
                 ;;
             --skip-start)
@@ -380,9 +377,8 @@ main() {
         esac
     done
 
-    if [[ "$SKIP_DEPS" == "false" ]]; then
-        install_dependencies
-    fi
+    # --skip-deps remains accepted; platform imports are always verified.
+    install_dependencies
 
     create_install_dir
     copy_files
