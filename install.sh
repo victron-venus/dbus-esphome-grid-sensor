@@ -162,19 +162,31 @@ exec multilog t s25000 n4 /var/log/dbus-grid-service
 EOF
     chmod +x "$staging/log/run"
 
-    # Stop both supervisors and stage only scripts, never live FIFO/lock files.
-    svc -dx "$SERVICE_DIR" "$SERVICE_DIR/log" 2>/dev/null || true
-    sleep 1
-    if [[ -d "$SERVICE_DIR" && ! -L "$SERVICE_DIR" ]]; then
-        mv "$SERVICE_DIR" "$INSTALL_DIR/legacy-service.$(date +%s)"
-    fi
+    # Preserve existing service/log directories and their supervisor state.
+    # Stage and atomically replace scripts, never copy FIFO/lock files.
     mkdir -p "$(dirname "$SERVICE_DATA_DIR")"
-    if [ -d "$SERVICE_DATA_DIR" ]; then
-        mv "$SERVICE_DATA_DIR" "$INSTALL_DIR/previous-service.$(date +%s)"
+    if [[ -d "$SERVICE_DIR" && ! -L "$SERVICE_DIR" ]]; then
+        if [ -e "$SERVICE_DATA_DIR" ]; then
+            rm -rf "$staging"
+            log_error "Conflicting legacy and persistent service directories; preserve both for review"
+            return 1
+        fi
+        svc -d "$SERVICE_DIR" 2>/dev/null || true
+        mv "$SERVICE_DIR" "$SERVICE_DATA_DIR"
     fi
-    [ "$SKIP_START" = false ] || touch "$staging/down"
-    mv "$staging" "$SERVICE_DATA_DIR"
+    mkdir -p "$SERVICE_DATA_DIR/log"
+    svc -d "$SERVICE_DIR" 2>/dev/null || true
+    mv "$staging/run" "$SERVICE_DATA_DIR/run"
+    mv "$staging/log/run" "$SERVICE_DATA_DIR/log/run"
+    rmdir "$staging/log" "$staging"
+    if [ "$SKIP_START" = true ]; then
+        touch "$SERVICE_DATA_DIR/down"
+    else
+        rm -f "$SERVICE_DATA_DIR/down"
+    fi
     ln -sfn "$SERVICE_DATA_DIR" "$SERVICE_DIR"
+    svc -t "$SERVICE_DIR/log" 2>/dev/null || true
+    svc -u "$SERVICE_DIR/log" 2>/dev/null || true
     cat > "$INSTALL_DIR/boot.sh" <<'BOOT'
 #!/bin/sh
 [ -x /data/dbus-grid-service/service/dbus-grid-service/run ] || exit 0

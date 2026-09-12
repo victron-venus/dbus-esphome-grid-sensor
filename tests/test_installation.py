@@ -77,6 +77,18 @@ def test_install_preserves_literal_configuration_and_boot_order(tmp_path):
     assert (service / "down").exists()
     assert "exec 2>&1" in (service / "run").read_text()
     assert "s25000 n4" in (service / "log/run").read_text()
+    for directory in (service / "supervise", service / "log/supervise"):
+        directory.mkdir()
+        (directory / "lock").write_text("owned-by-supervisor")
+        os.mkfifo(directory / "ok")
+    preserved = (
+        service.resolve(),
+        service / "log",
+        service / "supervise",
+        service / "log/supervise",
+    )
+    inodes = [path.stat().st_ino for path in preserved]
+    locks = [(path / "lock").stat().st_ino for path in preserved[2:]]
     environment["MQTT_PASSWORD"] = "replacement-must-not-overwrite"
     result = subprocess.run(
         ["bash", str(installer), "--skip-start"], env=environment, capture_output=True, text=True
@@ -85,3 +97,7 @@ def test_install_preserves_literal_configuration_and_boot_order(tmp_path):
     assert (installed / ".env").read_text() == config
     assert rc.read_text().splitlines().count(boot) == 1
     assert not list((tmp_path / "service").glob("*.old*"))
+    assert [path.stat().st_ino for path in preserved] == inodes
+    assert [(path / "lock").stat().st_ino for path in preserved[2:]] == locks
+    assert not list(installed.glob("previous-service.*"))
+    assert not list(installed.glob("service-stage.*"))

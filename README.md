@@ -359,8 +359,9 @@ library and retains compatibility with existing quoted dotenv settings. Existing
 are preserved and restricted to root. It uses native `multilog` with four
 rotated 25 KB files plus the current file, captures stdout and stderr, and
 restores the `/service` link before an existing `exit 0` in `/data/rc.local`.
-Old supervision directories stay outside `/service`, preventing duplicate
-processes. The service waits for the firmware's D-Bus; it never starts another
+Upgrades preserve service, log and supervisor directory inodes and replace only
+launcher files. Legacy service directories move intact to persistent storage.
+The service waits for the firmware's D-Bus; it never starts another
 system bus. `--systemd` remains available for hosts running systemd.
 
 ## Docker Deployment
