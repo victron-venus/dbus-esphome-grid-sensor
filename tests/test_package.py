@@ -15,8 +15,16 @@ def test_wheel_contains_runtime_module(tmp_path: Path) -> None:
     root = Path(__file__).resolve().parents[1]
     staging = tmp_path / "source"
     staging.mkdir()
-    for name in ("pyproject.toml", "README.md", "LICENSE"):
+    for name in (
+        "pyproject.toml",
+        "README.md",
+        "LICENSE",
+        "MANIFEST.in",
+        "install.sh",
+        "CHANGELOG.md",
+    ):
         shutil.copy2(root / name, staging / name)
+    shutil.copytree(root / "service", staging / "service")
     shutil.copytree(
         root / "src", staging / "src", ignore=shutil.ignore_patterns("*.egg-info", "__pycache__")
     )
@@ -45,3 +53,9 @@ def test_wheel_contains_runtime_module(tmp_path: Path) -> None:
             member = archive.extractfile(f"{prefix}/src/{name}")
             assert member is not None
             assert member.read() == (root / "src" / name).read_bytes()
+
+        for name in ("install.sh", "service/run"):
+            member = archive.extractfile(f"{prefix}/{name}")
+            assert member is not None
+            assert member.read() == (root / name).read_bytes()
+            assert archive.getmember(f"{prefix}/{name}").mode & 0o111

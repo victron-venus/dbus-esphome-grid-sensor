@@ -1,0 +1,3 @@
+include install.sh
+include CHANGELOG.md
+include service/run
