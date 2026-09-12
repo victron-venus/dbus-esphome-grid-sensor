@@ -1,0 +1,16 @@
+{
+  "name": "dbus-esphome-grid-sensor",
+  "include": [
+    "src",
+    "install.sh",
+    "service",
+    "esphome",
+    "pyproject.toml",
+    "MANIFEST.in",
+    "Dockerfile",
+    "docker-compose.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "wheel": true
+}
