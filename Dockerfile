@@ -1,6 +1,6 @@
-FROM debian:bookworm-slim AS builder
+FROM debian:bookworm-slim@sha256:88200866dfff7ea7f5cbcb6ec7c8a701889efe6fe859fe64d6990e4b07ea4171 AS builder
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-venv ca-certificates curl \
+    python3 python3-venv ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
 COPY pyproject.toml README.md LICENSE ./
@@ -8,13 +8,13 @@ COPY src/ ./src/
 RUN python3 -m venv --system-site-packages /opt/venv \
     && /opt/venv/bin/pip install --no-cache-dir .
 # Official Victron sources, with their license, pinned independently of the host.
-RUN curl -fLsS https://github.com/victronenergy/velib_python/archive/17bbcd4c632d3eda484cde611dc78bf8c2ba469f.tar.gz -o /tmp/velib.tar.gz \
-    && echo 'ad4c7501085153c7b0dd838dab531782e835d5828bf8afe0cb82e5edb0179710  /tmp/velib.tar.gz' | sha256sum -c - \
-    && mkdir /opt/velib_python \
+ADD --checksum=sha256:ad4c7501085153c7b0dd838dab531782e835d5828bf8afe0cb82e5edb0179710 \
+    https://github.com/victronenergy/velib_python/archive/17bbcd4c632d3eda484cde611dc78bf8c2ba469f.tar.gz /tmp/velib.tar.gz
+RUN mkdir /opt/velib_python \
     && tar -xzf /tmp/velib.tar.gz --strip-components=1 -C /opt/velib_python \
     && rm /tmp/velib.tar.gz
 
-FROM debian:bookworm-slim
+FROM debian:bookworm-slim@sha256:88200866dfff7ea7f5cbcb6ec7c8a701889efe6fe859fe64d6990e4b07ea4171
 # Use Debian's interpreter with its matching native GI and D-Bus bindings.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-dbus python3-gi gir1.2-glib-2.0 \

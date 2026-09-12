@@ -100,6 +100,11 @@ def normalize_payload(topic: str, payload: object) -> dict[str, Any]:
         payload = {"status": payload}
     if not isinstance(payload, dict):
         return {}
+    return validate_sample(payload, metrics)
+
+
+def validate_sample(payload: dict[str, Any], metrics: tuple[str, ...]) -> dict[str, Any]:
+    """Validate every value before exposing the sample to retained state."""
     # Validate the whole sample before modifying any retained readings.
     values: dict[str, Any] = {}
     for name in metrics:
