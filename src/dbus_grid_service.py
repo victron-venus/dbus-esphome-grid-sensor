@@ -52,7 +52,7 @@ except ImportError:
     sys.exit(1)
 
 
-VERSION = "1.0.2"
+VERSION = "1.0.3"
 
 # Configuration from environment
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
