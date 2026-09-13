@@ -20,3 +20,7 @@ bandit-results.json
 # Local coverage data
 .coverage
 .coverage.*
+# Frozen release overlays and final build staging
+.release-plan.json
+.release-inputs.json
+release-assets/

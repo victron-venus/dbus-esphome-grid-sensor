@@ -12,10 +12,55 @@
   ],
   "notes": [
     "Hardware-free checks do not validate a live Venus OS device, D-Bus firmware ABI, physical sensors or in-place device upgrades.",
-    "Candidate packaging preserves committed runtime version metadata. Nightly/beta/RC identity is recorded by the release manifest."
+    "Candidate overlays identify beta/nightly packages; RC packages retain the base version so stable promotes the exact verified bytes."
   ],
   "version_file": "pyproject.toml",
   "mode": "release",
   "repository": "victron-venus/dbus-esphome-grid-sensor",
-  "visibility": "public"
+  "visibility": "public",
+  "versioning": {
+    "schema": 1,
+    "promotion": "promote-bytes",
+    "files": [
+      {
+        "path": "pyproject.toml",
+        "format": "toml",
+        "value": "package",
+        "field": "project.version",
+        "ecosystem": "pep440"
+      },
+      {
+        "path": "src/dbus_grid_service.py",
+        "format": "python",
+        "value": "package",
+        "field": "VERSION",
+        "ecosystem": "pep440"
+      }
+    ],
+    "artifacts": [
+      {
+        "path": "dbus-esphome-grid-sensor-*.tar.gz",
+        "format": "tar-toml",
+        "value": "package",
+        "member": "dbus-esphome-grid-sensor/pyproject.toml",
+        "field": "project.version",
+        "ecosystem": "pep440"
+      },
+      {
+        "path": "dbus_esphome_grid_sensor-*.whl",
+        "format": "wheel",
+        "value": "package",
+        "package": "dbus-esphome-grid-sensor",
+        "ecosystem": "pep440"
+      },
+      {
+        "path": "dbus_esphome_grid_sensor-*.tar.gz",
+        "format": "sdist",
+        "value": "package",
+        "package": "dbus-esphome-grid-sensor",
+        "ecosystem": "pep440"
+      }
+    ],
+    "toolkit_revision": "fc404f055bbd72d9355f90d023065273d8016932"
+  }
 }
