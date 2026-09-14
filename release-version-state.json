@@ -1,0 +1,22 @@
+{
+  "counter": 1,
+  "plans": {
+    "34792023226": {
+      "parent": null,
+      "plan": {
+        "base_version": "1.0.3",
+        "build_number": 1,
+        "channel": "beta",
+        "policy_sha256": "4efc2031eb32ebf251ea3df7946f8cdfc9a603c91eb050e8d99ec21e6b85736e",
+        "promotion": "promote-bytes",
+        "schema_version": 1,
+        "sequence": 3,
+        "source_sha": "aba2a1ab4d937bc343d212fad944115cf736f746",
+        "tag": "v1.0.3-beta.3",
+        "version": "1.0.3-beta.3"
+      }
+    }
+  },
+  "publication_floor": 0,
+  "schema": 1
+}
