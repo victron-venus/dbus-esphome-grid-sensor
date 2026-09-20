@@ -10,7 +10,9 @@
     "Dockerfile",
     "docker-compose.yml",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    ".python-version",
+    "uv.lock"
   ],
   "wheel": true
 }

@@ -15,7 +15,7 @@ jobs:
     name: CI
     uses: victron-venus/venus-os-ci-toolkit/.github/workflows/python-ci.yml@892eb9f882d8a67b2df1c9b63567f0d4845fcf20
     with:
-      python-version: '3.11'
+      python-version: '3.12.13'
       # Hardware-free tests now exist; enable pytest execution
       run-tests: true
       # Enforce minimum coverage to prevent regressions
