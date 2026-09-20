@@ -1,4 +1,4 @@
-FROM debian:bookworm-slim@sha256:88200866dfff7ea7f5cbcb6ec7c8a701889efe6fe859fe64d6990e4b07ea4171 AS builder
+FROM ubuntu:24.04@sha256:008173c23f95b170204355c12626cb5a965d779a7e1283b09e9cffbb1bf33ca3 AS builder
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-venv ca-certificates \
     && rm -rf /var/lib/apt/lists/*
@@ -14,8 +14,8 @@ RUN mkdir /opt/velib_python \
     && tar -xzf /tmp/velib.tar.gz --strip-components=1 -C /opt/velib_python \
     && rm /tmp/velib.tar.gz
 
-FROM debian:bookworm-slim@sha256:88200866dfff7ea7f5cbcb6ec7c8a701889efe6fe859fe64d6990e4b07ea4171
-# Use Debian's interpreter with its matching native GI and D-Bus bindings.
+FROM ubuntu:24.04@sha256:008173c23f95b170204355c12626cb5a965d779a7e1283b09e9cffbb1bf33ca3
+# Use Ubuntu's Python 3.12 interpreter with its matching native GI and D-Bus bindings.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-dbus python3-gi gir1.2-glib-2.0 \
     && rm -rf /var/lib/apt/lists/*
