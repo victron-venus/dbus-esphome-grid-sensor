@@ -70,6 +70,7 @@ DEVICE_INSTANCE = int(os.getenv("DEVICE_INSTANCE", "42"))
 CUSTOM_NAME = os.getenv("CUSTOM_NAME", "ESPHome CT Grid Sensor")
 RECONNECT_DELAY = int(os.getenv("RECONNECT_DELAY", "5"))
 MQTT_KEEPALIVE = int(os.getenv("MQTT_KEEPALIVE", "60"))
+POWER_STALE_TIMEOUT = 30
 
 # Logging setup
 logging.basicConfig(
@@ -180,7 +181,9 @@ class DBusGridService:
         self.dbus_service.register()
         logger.info(f"D-Bus service registered: {self.service_name}")
 
-    def update_from_mqtt(self, topic: str, payload: Any) -> None:
+    def update_from_mqtt(
+        self, topic: str, payload: Any, *, received_at: float | None = None
+    ) -> None:
         """Accept flat JSON objects, per-topic numbers, and ESPHome state topics.
 
         This runs on the GLib thread. Only a valid power sample refreshes the
@@ -193,9 +196,11 @@ class DBusGridService:
             for name, value in values.items():
                 setattr(self.data, name, value)
             if "power" in values:
-                self.data.last_update = time.monotonic()
-                self.data.connected = True
-                self.data.status = 0
+                self.data.last_update = time.monotonic() if received_at is None else received_at
+                self.data.connected = (
+                    0 <= time.monotonic() - self.data.last_update <= POWER_STALE_TIMEOUT
+                )
+                self.data.status = 0 if self.data.connected else 2
             # An online LWT is availability, not a fresh measurement.
             if payload.get("status") == "offline":
                 self.data.connected = False
@@ -237,7 +242,10 @@ class DBusGridService:
     def check_connection_timeout(self) -> None:
         """Check if MQTT data is stale and mark disconnected"""
         with self._lock:
-            if time.monotonic() - self.data.last_update > 30 and self.data.connected:
+            if (
+                time.monotonic() - self.data.last_update > POWER_STALE_TIMEOUT
+                and self.data.connected
+            ):
                 logger.warning("MQTT data stale, marking disconnected")
                 self.data.connected = False
                 self.data.status = 2
@@ -300,6 +308,7 @@ class MQTTHandler:
         logger.debug(f"MQTT subscribed: mid={mid}")
 
     def _on_message(self, client: mqtt.Client, userdata: Any, msg: mqtt.MQTTMessage) -> None:
+        received_at = time.monotonic()
         try:
             topic = msg.topic
             raw = msg.payload.decode()
@@ -311,16 +320,16 @@ class MQTTHandler:
 
             logger.debug(f"MQTT: {topic} = {payload}")
             # Only GLib may access the D-Bus connection.
-            GLib.idle_add(self._apply_message, topic, payload)
+            GLib.idle_add(self._apply_message, topic, payload, received_at)
 
         except json.JSONDecodeError:
             logger.warning("Invalid JSON on %s: %r", msg.topic, msg.payload)
         except Exception as e:
             logger.error(f"Error processing MQTT message: {e}")
 
-    def _apply_message(self, topic: str, payload: Any) -> bool:
+    def _apply_message(self, topic: str, payload: Any, received_at: float) -> bool:
         try:
-            self.dbus_service.update_from_mqtt(topic, payload)
+            self.dbus_service.update_from_mqtt(topic, payload, received_at=received_at)
         except (TypeError, ValueError) as exc:
             logger.warning("Invalid grid measurement on %s: %s", topic, exc)
         return False

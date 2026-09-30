@@ -2,6 +2,7 @@
 
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -29,7 +30,10 @@ def test_install_preserves_literal_configuration_and_boot_order(tmp_path):
     rc.write_text("#!/bin/sh\necho existing-boot-task\nexit 0\n")
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    (bin_dir / "python3").symlink_to(sys.executable)
+    # An extra symlink outside a venv can make Python lose its pyvenv.cfg.
+    python = bin_dir / "python3"
+    python.write_text(f'#!/bin/sh\nexec {shlex.quote(sys.executable)} "$@"\n')
+    python.chmod(0o755)
     for name, output in (
         ("id", "echo 0"),
         ("svc", "exit 0"),

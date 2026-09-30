@@ -463,5 +463,6 @@ registration. MQTT callbacks hand updates to the GLib thread and subscribe once
 to the topic prefix. A power sample establishes freshness. Availability and
 energy-counter messages cannot keep an old power value online. After 30 seconds
 without valid power, instantaneous measurements become invalid and `/Connected`
-becomes zero. A new valid power sample restores the meter. Broker reconnection
-is asynchronous and does not prevent the D-Bus loop from running.
+becomes zero. Freshness starts when MQTT receives the sample, so time spent in
+the GLib queue cannot extend it. A new valid power sample restores the meter.
+Broker reconnection is asynchronous and does not prevent the D-Bus loop from running.

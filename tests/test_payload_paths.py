@@ -363,6 +363,58 @@ def test_mqtt_defers_dbus_writes_until_glib_callback(dgs, monkeypatch):
     assert dgs.dbus_service.paths["/Ac/Power"] == 42.0
 
 
+@pytest.mark.parametrize("delay", [30.001, 300.0])
+def test_delayed_mqtt_power_cannot_reconnect_stale_meter(dgs, monkeypatch, delay):
+    now = [100.0]
+    pending = []
+    monkeypatch.setattr(svc.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(
+        svc.GLib, "idle_add", lambda callback, *args: pending.append((callback, args))
+    )
+    dgs.update_from_mqtt("grid-sensor/power", 10.0)
+    handler = svc.MQTTHandler(dgs)
+    handler._on_message(None, None, _mqtt_message("grid-sensor/power", 42.0))
+
+    # The main loop may be delayed, even though MQTT already received the sample.
+    now[0] += delay
+    dgs.check_connection_timeout()
+    callback, args = pending.pop()
+    assert callback(*args) is False
+    assert dgs.dbus_service.paths["/Connected"] == 0
+    assert dgs.dbus_service.paths["/Ac/Power"] is None
+    assert dgs.dbus_service.paths["/Status"] == 2
+
+    # A new sample still restores normal publication.
+    handler._on_message(None, None, _mqtt_message("grid-sensor/power", 43.0))
+    callback, args = pending.pop()
+    assert callback(*args) is False
+    assert dgs.dbus_service.paths["/Connected"] == 1
+    assert dgs.dbus_service.paths["/Ac/Power"] == 43.0
+
+
+def test_queued_mqtt_power_expires_from_receipt_not_delivery(dgs, monkeypatch):
+    now = [100.0]
+    pending = []
+    monkeypatch.setattr(svc.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(
+        svc.GLib, "idle_add", lambda callback, *args: pending.append((callback, args))
+    )
+    handler = svc.MQTTHandler(dgs)
+    handler._on_message(None, None, _mqtt_message("grid-sensor/power", 42.0))
+    now[0] = 120.0
+    callback, args = pending.pop()
+    assert callback(*args) is False
+    assert dgs.dbus_service.paths["/Ac/Power"] == 42.0
+
+    now[0] = 130.0
+    dgs.check_connection_timeout()
+    assert dgs.dbus_service.paths["/Connected"] == 1
+    now[0] += 0.001
+    dgs.check_connection_timeout()
+    assert dgs.dbus_service.paths["/Connected"] == 0
+    assert dgs.dbus_service.paths["/Ac/Power"] is None
+
+
 def test_startup_registers_invalid_measurements_until_power_arrives(dgs):
     assert dgs.dbus_service.registered
     assert dgs.dbus_service.paths["/Ac/Power"] is None
