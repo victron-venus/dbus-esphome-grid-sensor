@@ -84,7 +84,9 @@ import dbus_grid_service as svc  # noqa: E402
 def test_griddata_defaults():
     g = svc.GridData()
     assert g.power == 0.0
-    assert g.voltage == 230.0
+    assert g.voltage is None
+    assert g.current is None
+    assert g.frequency is None
     assert g.connected is False
     assert g.status == 0
 
@@ -478,3 +480,33 @@ def test_custom_prefix_and_plain_availability(dgs, monkeypatch):
     message.payload = b"offline"
     handler._on_message(handler.client, None, message)
     assert not dgs.data.connected
+
+
+def test_power_only_does_not_publish_unmeasured_instantaneous(dgs):
+    """ESPHOMEGRID-1: power-only must not expose GridData constructor defaults as live AC."""
+    dgs.update_from_mqtt("grid-sensor/power", {"value": 1234.5})
+    paths = dgs.dbus_service.paths
+    assert paths["/Ac/Power"] == 1234.5
+    assert paths["/Connected"] == 1
+    assert paths["/Ac/L1/Voltage"] is None
+    assert paths["/Ac/L1/Current"] is None
+    assert paths["/Ac/Frequency"] is None
+
+
+def test_stale_clears_frequency_with_other_instantaneous(dgs):
+    """ESPHOMEGRID-2: frequency is instantaneous and must clear when power goes stale."""
+    import time as _time
+
+    dgs.update_from_mqtt(
+        "grid-sensor/state",
+        {"power": 10.0, "voltage": 231.0, "current": 1.0, "frequency": 50.02},
+    )
+    assert dgs.dbus_service.paths["/Ac/Frequency"] == 50.02
+    dgs.data.last_update = _time.monotonic() - 60
+    dgs.check_connection_timeout()
+    paths = dgs.dbus_service.paths
+    assert paths["/Connected"] == 0
+    assert paths["/Ac/Power"] is None
+    assert paths["/Ac/L1/Voltage"] is None
+    assert paths["/Ac/L1/Current"] is None
+    assert paths["/Ac/Frequency"] is None

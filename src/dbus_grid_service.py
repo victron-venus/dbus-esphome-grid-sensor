@@ -85,11 +85,12 @@ class GridData:
     """Container for grid sensor data"""
 
     power: float = 0.0  # W
-    voltage: float = 230.0  # V
-    current: float = 0.0  # A
+    # Instantaneous AC readings stay unset until a validated sample arrives.
+    voltage: float | None = None  # V
+    current: float | None = None  # A
     energy_forward: float = 0.0  # kWh
     energy_reverse: float = 0.0  # kWh
-    frequency: float = 50.0  # Hz
+    frequency: float | None = None  # Hz
     status: int = 0  # 0=OK, 1=Warning, 2=Error
     last_update: float = field(default_factory=time.monotonic)
     connected: bool = False
@@ -225,11 +226,20 @@ class DBusGridService:
             # Power values (positive = import, negative = export)
             self.dbus_service["/Ac/Power"] = self.data.power if self.data.connected else None
             self.dbus_service["/Ac/L1/Power"] = self.data.power if self.data.connected else None
-            self.dbus_service["/Ac/L1/Voltage"] = self.data.voltage if self.data.connected else None
-            self.dbus_service["/Ac/L1/Current"] = self.data.current if self.data.connected else None
+            # Instantaneous voltage/current/frequency: only when connected AND measured.
+            self.dbus_service["/Ac/L1/Voltage"] = (
+                self.data.voltage if self.data.connected and self.data.voltage is not None else None
+            )
+            self.dbus_service["/Ac/L1/Current"] = (
+                self.data.current if self.data.connected and self.data.current is not None else None
+            )
             self.dbus_service["/Ac/Energy/Forward"] = self.data.energy_forward
             self.dbus_service["/Ac/Energy/Reverse"] = self.data.energy_reverse
-            self.dbus_service["/Ac/Frequency"] = self.data.frequency
+            self.dbus_service["/Ac/Frequency"] = (
+                self.data.frequency
+                if self.data.connected and self.data.frequency is not None
+                else None
+            )
 
             # Connection status: 1 on D-Bus = connected
             self.dbus_service["/Connected"] = 1 if self.data.connected else 0
