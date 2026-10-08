@@ -1,4 +1,4 @@
-FROM ubuntu:25.10@sha256:7cc5e35f6567ee8c66d2abb4aab0fd866669e6207c237c3a8f0947a5c7f17092 AS builder
+FROM ubuntu:24.04@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55 AS builder
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-venv ca-certificates \
     && rm -rf /var/lib/apt/lists/*
@@ -14,8 +14,8 @@ RUN mkdir /opt/velib_python \
     && tar -xzf /tmp/velib.tar.gz --strip-components=1 -C /opt/velib_python \
     && rm /tmp/velib.tar.gz
 
-FROM ubuntu:25.10@sha256:7cc5e35f6567ee8c66d2abb4aab0fd866669e6207c237c3a8f0947a5c7f17092
-# Use Ubuntu's Python 3.12 interpreter with its matching native GI and D-Bus bindings.
+FROM ubuntu:24.04@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55
+# Use Ubuntu 24.04's Python 3.12 interpreter with its matching native GI and D-Bus bindings.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-dbus python3-gi gir1.2-glib-2.0 \
     && rm -rf /var/lib/apt/lists/*
