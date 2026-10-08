@@ -18,3 +18,24 @@ jobs:
       run-tests: true
       # Enforce minimum coverage to prevent regressions
       coverage-threshold: 50
+
+  firmware:
+    name: ESPHome firmware (synthetic configuration)
+    runs-on: ${{ fromJSON((vars.CI_RUNNER_MODE == 'self-hosted' || vars.CI_RUNNER_MODE == 'k3s') && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (contains(fromJSON('["push","schedule","workflow_dispatch"]'), github.event_name) && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))) && (vars.CI_RUNNER_LABELS || '[]') || '["ubuntu-latest"]') }}
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@351661ca32ac09a36dc5ee2d536e3128f2a3c8ed # v2.22.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate and compile without flashing any device
+        run: >-
+          docker run --rm --volume "$PWD:/workspace:ro" --workdir /workspace
+          --entrypoint python
+          ghcr.io/esphome/esphome:2026.9.1@sha256:776a845d508909bf426d2ee7bdd81796361ebe6a7f091807ce1d6d0b48985413
+          tests/firmware/check_profile.py --compile

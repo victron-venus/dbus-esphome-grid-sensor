@@ -24,3 +24,8 @@ bandit-results.json
 .release-plan.json
 .release-inputs.json
 release-assets/
+
+# Local firmware credentials and generated binaries
+esphome/secrets.yaml
+esphome/.esphome/
+esphome/build/
