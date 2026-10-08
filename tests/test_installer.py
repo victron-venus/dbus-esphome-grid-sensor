@@ -5,6 +5,20 @@ import subprocess
 from pathlib import Path
 
 
+def test_installer_errors_use_stderr() -> None:
+    """Inspect the real error helper without invoking an installation."""
+    source = (Path(__file__).resolve().parents[1] / "install.sh").read_text()
+    function = "log_error() {" + source.split("log_error() {", 1)[1].split("\ncheck_root()", 1)[0]
+    result = subprocess.run(
+        ["bash", "-c", 'set -eu\nRED=""\nNC=""\n' + function + '\nlog_error "failure detail"\n'],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert result.stdout == ""
+    assert result.stderr == "[ERROR] failure detail\n"
+
+
 def test_systemd_generator_uses_persistent_install_directory(tmp_path: Path) -> None:
     """The installer must not generate a unit pointing at its old /opt location."""
     root = Path(__file__).resolve().parents[1]
