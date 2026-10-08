@@ -67,7 +67,7 @@ def read_settings(path: Path) -> dict[str, str]:
         if not separator:
             continue
         key = key.strip()
-        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
+        if not re.fullmatch(r"[A-Za-z_]\w*", key, flags=re.ASCII):
             raise ValueError(f"Invalid configuration key: {key}")
         value = value.lstrip()
         if value.startswith(("'", '"')):

@@ -13,6 +13,7 @@ Publishes ESPHome current-transformer measurements as a Victron D-Bus grid meter
 
 ### Maintenance
 
+- Preserve exception tracebacks for D-Bus writes and MQTT connection/message failures, and send installer errors to stderr.
 - Publish reviewed release notes from the exact source commit used to build each candidate, preserving build provenance.
 - Document contribution checks, confidential security reporting and the project-specific trust boundaries.
 

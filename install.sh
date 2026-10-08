@@ -45,7 +45,7 @@ log_warning() {
 }
 
 log_error() {
-    echo -e "${RED}[ERROR]${NC} $*"
+    echo -e "${RED}[ERROR]${NC} $*" >&2
 }
 
 check_root() {
@@ -103,7 +103,7 @@ copy_files() {
     cp "$SCRIPT_DIR/src/service_launcher.py" "$INSTALL_DIR/"
 
     # Preserve existing settings during upgrades.
-    if [ ! -f "$INSTALL_DIR/.env" ]; then
+    if [[ ! -f "$INSTALL_DIR/.env" ]]; then
     # Keep spaces, quotes and shell-like characters as literal configuration.
     MQTT_BROKER="$MQTT_BROKER" MQTT_PORT="$MQTT_PORT" \
     MQTT_USERNAME="$MQTT_USERNAME" MQTT_PASSWORD="$MQTT_PASSWORD" \
@@ -166,7 +166,7 @@ EOF
     # Stage and atomically replace scripts, never copy FIFO/lock files.
     mkdir -p "$(dirname "$SERVICE_DATA_DIR")"
     if [[ -d "$SERVICE_DIR" && ! -L "$SERVICE_DIR" ]]; then
-        if [ -e "$SERVICE_DATA_DIR" ]; then
+        if [[ -e "$SERVICE_DATA_DIR" ]]; then
             rm -rf "$staging"
             log_error "Conflicting legacy and persistent service directories; preserve both for review"
             return 1
@@ -179,7 +179,7 @@ EOF
     mv "$staging/run" "$SERVICE_DATA_DIR/run"
     mv "$staging/log/run" "$SERVICE_DATA_DIR/log/run"
     rmdir "$staging/log" "$staging"
-    if [ "$SKIP_START" = true ]; then
+    if [[ "$SKIP_START" = true ]]; then
         touch "$SERVICE_DATA_DIR/down"
     else
         rm -f "$SERVICE_DATA_DIR/down"
@@ -284,7 +284,7 @@ start_service() {
     # Try daemontools first (Venus OS standard)
     if command -v svc &> /dev/null && [[ -d "$SERVICE_DIR" ]]; then
         local attempts=0
-        until [ -p "$SERVICE_DIR/supervise/ok" ] || [ "$attempts" -ge 15 ]; do
+        until [[ -p "$SERVICE_DIR/supervise/ok" || "$attempts" -ge 15 ]]; do
             sleep 1
             attempts=$((attempts + 1))
         done
@@ -360,8 +360,10 @@ main() {
     SKIP_START=false
     USE_SYSTEMD=false
 
+    local option
     while [[ $# -gt 0 ]]; do
-        case $1 in
+        option=$1
+        case $option in
             --skip-deps)
                 log_info "Platform dependencies are verified without installation"
                 shift
@@ -384,7 +386,7 @@ main() {
                 exit 0
                 ;;
             *)
-                log_error "Unknown option: $1"
+                log_error "Unknown option: $option"
                 exit 1
                 ;;
         esac

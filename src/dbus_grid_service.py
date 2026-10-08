@@ -63,7 +63,7 @@ MQTT_TOPIC_PREFIX = os.getenv("MQTT_TOPIC_PREFIX", "grid-sensor")
 
 # D-Bus well-known name elements may not start with a digit.
 DBUS_SUFFIX = os.getenv("DBUS_INSTANCE", "42")
-if not re.fullmatch(r"[A-Za-z0-9_]+", DBUS_SUFFIX):
+if not re.fullmatch(r"\w+", DBUS_SUFFIX, flags=re.ASCII):
     raise ValueError("DBUS_INSTANCE must contain only letters, digits, or underscores")
 DBUS_SERVICE_NAME = f"com.victronenergy.grid.esphome_{DBUS_SUFFIX}"
 DEVICE_INSTANCE = int(os.getenv("DEVICE_INSTANCE", "42"))
@@ -91,7 +91,7 @@ class GridData:
     energy_forward: float = 0.0  # kWh
     energy_reverse: float = 0.0  # kWh
     frequency: float | None = None  # Hz
-    status: int = 0  # 0=OK, 1=Warning, 2=Error
+    status: int = 0  # Zero means OK; one means warning; two means error.
     last_update: float = field(default_factory=time.monotonic)
     connected: bool = False
 
@@ -247,7 +247,7 @@ class DBusGridService:
             self.dbus_service["/ErrorCode"] = 0 if self.data.connected else 1
 
         except Exception as e:
-            logger.error(f"Failed to update D-Bus: {e}")
+            logger.exception("Failed to update D-Bus: %s", e)
 
     def check_connection_timeout(self) -> None:
         """Check if MQTT data is stale and mark disconnected"""
@@ -335,7 +335,7 @@ class MQTTHandler:
         except json.JSONDecodeError:
             logger.warning("Invalid JSON on %s: %r", msg.topic, msg.payload)
         except Exception as e:
-            logger.error(f"Error processing MQTT message: {e}")
+            logger.exception("Error processing MQTT message: %s", e)
 
     def _apply_message(self, topic: str, payload: Any, received_at: float) -> bool:
         try:
@@ -350,7 +350,7 @@ class MQTTHandler:
             self.client.loop_start()
             return True
         except Exception as e:
-            logger.error(f"MQTT connect error: {e}")
+            logger.exception("MQTT connect error: %s", e)
             return False
 
     def disconnect(self) -> None:

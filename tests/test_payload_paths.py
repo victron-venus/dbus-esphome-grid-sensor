@@ -81,6 +81,52 @@ import dbus_grid_service as svc  # noqa: E402
 # --- GridData assertions -----------------------------------------------------
 
 
+def test_dbus_write_failure_logs_traceback_without_escaping(dgs, monkeypatch, caplog):
+    """A rejected D-Bus write retains its cause and the service keeps running."""
+    error = RuntimeError("D-Bus write rejected")
+
+    def reject_write(self, path, value):
+        raise error
+
+    monkeypatch.setattr(_StubVeDbusService, "__setitem__", reject_write)
+    dgs._push_to_dbus()
+    record = caplog.records[-1]
+    assert record.getMessage() == "Failed to update D-Bus: D-Bus write rejected"
+    assert record.exc_info is not None
+    assert record.exc_info[1] is error
+
+
+def test_mqtt_decode_failure_logs_traceback_without_escaping(dgs, caplog):
+    """Invalid transport bytes retain the decode failure for diagnosis."""
+    handler = svc.MQTTHandler(dgs)
+    message = svc.mqtt.MQTTMessage(topic=b"grid-sensor/power")
+    message.payload = b"\xff"
+    handler._on_message(handler.client, None, message)
+    record = caplog.records[-1]
+    assert record.getMessage().startswith("Error processing MQTT message:")
+    assert record.exc_info is not None
+    assert isinstance(record.exc_info[1], UnicodeDecodeError)
+
+
+def test_mqtt_connect_failure_keeps_false_result_and_traceback(dgs, monkeypatch, caplog):
+    """The retry caller still receives False and a connection traceback is logged."""
+    handler = svc.MQTTHandler(dgs)
+    error = OSError("broker unavailable")
+    loop_calls = []
+
+    def reject_connect(*args, **kwargs):
+        raise error
+
+    monkeypatch.setattr(handler.client, "connect_async", reject_connect)
+    monkeypatch.setattr(handler.client, "loop_start", lambda: loop_calls.append(True))
+    assert handler.connect() is False
+    assert loop_calls == []
+    record = caplog.records[-1]
+    assert record.getMessage() == "MQTT connect error: broker unavailable"
+    assert record.exc_info is not None
+    assert record.exc_info[1] is error
+
+
 def test_griddata_defaults():
     g = svc.GridData()
     assert g.power == 0.0
