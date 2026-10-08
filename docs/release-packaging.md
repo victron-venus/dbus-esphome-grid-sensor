@@ -38,3 +38,6 @@ from a branch or tag push. Use the shared client's explicit registry promotion
 command for approved stable artifacts. Physical device/firmware tests and any
 separate PyPI or deployment approvals remain required outside hardware-free CI.
 The release policy lists project-specific limits.
+
+Dependency updates and reproducible build setup are described in
+[Python dependency locks](dependency-locks.md).

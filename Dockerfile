@@ -5,8 +5,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /build
 COPY pyproject.toml README.md LICENSE ./
 COPY src/ ./src/
-RUN python3 -m venv --system-site-packages /opt/venv \
-    && /opt/venv/bin/pip install --no-cache-dir .
+COPY .github/requirements-release-build.txt .github/requirements-runtime.txt ./.github/
+RUN python3 -m venv /opt/build-venv \
+    && /opt/build-venv/bin/pip install --no-cache-dir --require-hashes --only-binary=:all: -r .github/requirements-release-build.txt \
+    && /opt/build-venv/bin/python -m build --no-isolation --wheel --outdir /tmp/wheels . \
+    && python3 -m venv --system-site-packages /opt/venv \
+    && /opt/venv/bin/pip install --no-cache-dir --require-hashes --only-binary=:all: -r .github/requirements-runtime.txt \
+    && /opt/venv/bin/pip install --no-cache-dir --no-deps --no-index /tmp/wheels/*.whl
 # Official Victron sources, with their license, pinned independently of the host.
 ADD --checksum=sha256:ad4c7501085153c7b0dd838dab531782e835d5828bf8afe0cb82e5edb0179710 \
     https://github.com/victronenergy/velib_python/archive/17bbcd4c632d3eda484cde611dc78bf8c2ba469f.tar.gz /tmp/velib.tar.gz
