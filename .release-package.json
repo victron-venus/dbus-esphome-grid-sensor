@@ -12,7 +12,9 @@
     "README.md",
     "LICENSE",
     ".python-version",
-    "uv.lock"
+    "uv.lock",
+    ".github/requirements-release-build.txt",
+    ".github/requirements-runtime.txt"
   ],
   "wheel": true
 }
