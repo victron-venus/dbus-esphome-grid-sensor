@@ -5,6 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from dotenv import dotenv_values, set_key
 
 import service_launcher
@@ -112,3 +113,31 @@ def test_reader_preserves_multiline_spaces_and_ignores_quoted_comments(tmp_path)
     path = tmp_path / ".env"
     path.write_text('CUSTOM_NAME="first \n second " # comment "with quotes"\n')
     assert read_settings(path) == {"CUSTOM_NAME": "first \n second "}
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("meter # comment", "meter"),
+        ("meter\t# comment", "meter"),
+        ("meter\u00a0# comment", "meter"),
+        ("meter#one # comment", "meter#one"),
+        ("#literal", "#literal"),
+        ("meter  room\t", "meter  room"),
+        ("a" + " " * 200_000 + "b", "a" + " " * 200_000 + "b"),
+    ],
+)
+def test_unquoted_comment_boundary_preserves_literal_values(tmp_path, value, expected):
+    """Long space runs remain data and do not trigger regex backtracking."""
+    path = tmp_path / ".env"
+    path.write_text("CUSTOM_NAME=" + value + "\n")
+    assert service_launcher.read_settings(path) == {"CUSTOM_NAME": expected}
+
+
+@pytest.mark.parametrize("key", ["KEY\u0661", "KEY\u00e9", "KEY-ONE", "1KEY"])
+def test_reader_rejects_non_ascii_or_invalid_environment_keys(tmp_path, key):
+    """Environment names retain the ASCII installer contract."""
+    path = tmp_path / ".env"
+    path.write_text(key + "=value\n")
+    with pytest.raises(ValueError, match="Invalid configuration key"):
+        service_launcher.read_settings(path)

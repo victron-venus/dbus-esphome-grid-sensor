@@ -3,7 +3,49 @@
 import os
 import re
 import sys
+from collections.abc import Iterator
 from pathlib import Path
+
+_ESCAPES = {"n": "\n", "r": "\r", "t": "\t", "b": "\b", "f": "\f", "a": "\a", "v": "\v"}
+
+
+def _quoted_value(value: str, lines: Iterator[str], key: str) -> str:
+    """Read and decode a quoted value, including legacy multiline settings."""
+    quote = value[0]
+    pattern = re.compile(
+        re.escape(quote)
+        + r"((?:\\.|[^\\"
+        + re.escape(quote)
+        + r"])*)"
+        + re.escape(quote)
+        + r"[ \t]*(?:#.*)?",
+        re.DOTALL,
+    )
+    match = pattern.fullmatch(value)
+    while match is None:
+        continuation = next(lines, None)
+        if continuation is None:
+            raise ValueError(f"Unterminated quoted value for {key}")
+        value += "\n" + continuation.rstrip("\r\n")
+        match = pattern.fullmatch(value)
+    value = match.group(1)
+    if quote == "'":
+        value = re.sub(r"\\(['\\])", lambda item: item.group(1), value)
+    else:
+        value = re.sub(
+            r"\\([\\\"'abfnrtv])",
+            lambda item: _ESCAPES.get(item.group(1), item.group(1)),
+            value,
+        )
+    return value
+
+
+def _unquoted_value(value: str) -> str:
+    """Find a whitespace-delimited comment in one pass without backtracking."""
+    for index, character in enumerate(value):
+        if character == "#" and index > 0 and value[index - 1].isspace():
+            return value[:index].rstrip()
+    return value.rstrip()
 
 
 def read_settings(path: Path) -> dict[str, str]:
@@ -17,7 +59,6 @@ def read_settings(path: Path) -> dict[str, str]:
         return {}
     settings = {}
     lines = iter(path.read_text(encoding="utf-8").splitlines(keepends=True))
-    escapes = {"n": "\n", "r": "\r", "t": "\t", "b": "\b", "f": "\f", "a": "\a", "v": "\v"}
     for line in lines:
         line = line.rstrip("\r\n").lstrip()
         if not line or line.startswith("#"):
@@ -30,34 +71,9 @@ def read_settings(path: Path) -> dict[str, str]:
             raise ValueError(f"Invalid configuration key: {key}")
         value = value.lstrip()
         if value.startswith(("'", '"')):
-            quote = value[0]
-            pattern = re.compile(
-                re.escape(quote)
-                + r"((?:\\.|[^\\"
-                + re.escape(quote)
-                + r"])*)"
-                + re.escape(quote)
-                + r"[ \t]*(?:#.*)?",
-                re.DOTALL,
-            )
-            match = pattern.fullmatch(value)
-            while match is None:
-                continuation = next(lines, None)
-                if continuation is None:
-                    raise ValueError(f"Unterminated quoted value for {key}")
-                value += "\n" + continuation.rstrip("\r\n")
-                match = pattern.fullmatch(value)
-            value = match.group(1)
-            if quote == "'":
-                value = re.sub(r"\\(['\\])", lambda item: item.group(1), value)
-            else:
-                value = re.sub(
-                    r"\\([\\\"'abfnrtv])",
-                    lambda item: escapes.get(item.group(1), item.group(1)),
-                    value,
-                )
+            value = _quoted_value(value, lines, key)
         else:
-            value = re.split(r"\s+#", value, maxsplit=1)[0].rstrip()
+            value = _unquoted_value(value)
         settings[key] = value
     return settings
 
