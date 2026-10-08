@@ -21,3 +21,13 @@ Validate external values at trust boundaries, reject unsupported or malformed co
 Obtain source and published artifacts through the repository's HTTPS URLs. Verify published checksums or provenance when provided, over an authenticated channel. Keep local configuration, credentials and private keys out of source control and logs. Report suspected exposure through the private channel so credentials can be revoked and replaced; deleting a file alone does not revoke it.
 
 [OpenSSF evidence and remaining verification](docs/openssf-evidence.md) is maintained separately from this policy.
+
+## Firmware transport profile
+
+The [firmware guide](esphome/README.md) specifies ESPHome 2026.9.1, a fresh per-device
+32-byte OS-generated key for new installations, and required encrypted API/OTA
+communication. Existing installations retain their current API key during the
+explicit migration. The transitional first upload can be plaintext and expose
+embedded secrets; prefer serial provisioning or a controlled trusted local network.
+Final encrypted OTA refuses plaintext fallback. This does not encrypt MQTT traffic,
+prove installed-device key entropy or qualify the electrical measurements.

@@ -3,7 +3,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/victron-venus/dbus-esphome-grid-sensor?label=version)](https://github.com/victron-venus/dbus-esphome-grid-sensor/releases)
 [![License: MIT](https://img.shields.io/github/license/victron-venus/dbus-esphome-grid-sensor)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.12-blue)](pyproject.toml)
-[![ESPHome](https://img.shields.io/badge/ESPHome-2024.0%2B-2496ED?logo=esphome&logoColor=white)](https://esphome.io/)
+[![ESPHome](https://img.shields.io/badge/ESPHome-2026.9.1-2496ED?logo=esphome&logoColor=white)](https://esphome.io/)
 [![Victron Venus OS](https://img.shields.io/badge/Victron-Venus%20OS-orange)](https://www.victronenergy.com/live/venus-os:start)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
 
@@ -41,8 +41,8 @@ flowchart TD
         direction TB
         CurrentSensor["ADC Sensor\n64 samples, sliding avg"]
         PowerCalc["Template Sensor\nP = V × I × PF"]
-        EnergyFwd["Integration Sensor\n∫P dt (import)"]
-        EnergyRev["Integration Sensor\n∫(-P) dt (export)"]
+        EnergyFwd["Integration Sensor\nAccumulated ∫P dt\nNeeds qualification"]
+        EnergyRev["Integration + Sign Filter\nMagnitude of negative accumulated value\nNeeds qualification"]
         MQTTClient["MQTT Client\nDiscovery + Retain"]
     end
 
@@ -70,7 +70,7 @@ flowchart TD
     PowerCalc --> EnergyFwd
     PowerCalc --> EnergyRev
     EnergyFwd & EnergyRev & CurrentSensor & PowerCalc --> MQTTClient
-    MQTTClient -.->|MQTT\nTLS optional| Sub
+    MQTTClient -.->|Plaintext MQTT\nTrusted network required| Sub
     Sub --> DBusPub
     DBusPub --> Instance
     Instance --> DBUS
@@ -91,10 +91,10 @@ flowchart TD
 ## Features
 
 - **Real-time grid monitoring**: Power (W), Voltage (V), Current (A), Energy (kWh)
-- **Feed-in detection**: Automatic detection of grid export (negative power)
+- **Negative-power indication**: Reports a negative computed value; the template does not establish physical flow direction
 - **Venus OS integration**: Registers as standard `com.victronenergy.grid` device
 - **ESPHome firmware**: OTA updates, WiFi fallback AP, MQTT discovery
-- **Calibration support**: Adjustable CT calibration via substitutions
+- **Calibration input**: Required operator-supplied calibration table; synthetic CI values do not qualify hardware
 - **Optional ADS1115**: Higher resolution 16-bit ADC support
 - **Docker deployment**: Containerized D-Bus service for Venus OS
 - **Systemd/daemontools**: Production-ready service management
@@ -103,7 +103,7 @@ flowchart TD
 
 | Component | Specification | Notes |
 |-----------|---------------|-------|
-| ESP32 | DevKit V1, ESP32-S3, or similar | Any ESP32 with ADC (GPIO34 input-only) |
+| ESP32 | `esp32dev` / DevKit V1 build profile, GPIO34 ADC input | Other boards, including ESP32-S3, require a port and validation |
 | CT Sensor | SCT-013-000 (100A, 50mA output) | Or compatible 0-50mA CT |
 | Burden Resistor | 33Ω (3.3V ADC) / 100Ω (5V+divider) | Calculated for 1.65V at 100A |
 | 3.5mm Jack | Stereo, panel mount | For CT connection |
@@ -202,30 +202,20 @@ For SCT-013-000 (100A = 50mA secondary):
 
 ## Quick Start
 
-### 1. Configure ESPHome
+### 1. Configure and validate the firmware
 
-```bash
-cd esphome
-cp secrets.yaml.example secrets.yaml
-# Edit secrets.yaml with your WiFi/MQTT credentials
-```
+Follow [the pinned firmware profile](esphome/README.md). It uses ESPHome 2026.9.1,
+a required local calibration table and encrypted API/OTA communication. Copy
+`esphome/secrets.yaml.example` to `esphome/secrets.yaml`, replace every placeholder
+and supply measured calibration points. The example intentionally does not compile
+until configured; CI uses a separate synthetic table that must not be flashed.
 
-Key substitutions in `grid-sensor.yaml`:
-```yaml
-substitutions:
-  device_name: "grid-sensor"
-  friendly_name: "Grid Power Sensor"
-  ct_calibration: "60.6"  # A/V - calibrate with known load
-  nominal_voltage: "230"  # Your grid voltage
-```
+### 2. Build and provision deliberately
 
-### 2. Flash ESPHome Firmware
-
-```bash
-esphome run grid-sensor.yaml
-# Or for OTA after first flash:
-esphome run --device <IP> grid-sensor.yaml
-```
+The firmware guide separates a local compile from installation and explains the
+required two-stage migration for existing password-only OTA devices. Do not switch
+an existing device directly to required encryption before its firmware can offer
+it. No repository validation command flashes a device.
 
 ### 3. Run D-Bus Service (Docker)
 
@@ -262,24 +252,18 @@ mosquitto_sub -t 'grid-sensor/#' -v
 | `CUSTOM_NAME` | `ESPHome CT Grid Sensor` | Display name |
 | `RECONNECT_DELAY` | `5` | MQTT reconnect delay (seconds) |
 
-### ESPHome Substitutions
+### ESPHome calibration and limitations
 
-| Substitution | Default | Description |
-|--------------|---------|-------------|
-| `ct_calibration` | `60.6` | Current calibration (A/V) |
-| `nominal_voltage` | `230` | Grid voltage for power calc |
-| `wifi_ssid` | *required* | WiFi SSID |
-| `wifi_password` | *required* | WiFi password |
-| `mqtt_broker` | *required* | MQTT broker IP |
-| `mqtt_port` | `1883` | MQTT port |
+`ct_calibration_points` is a required list in local `esphome/secrets.yaml`, consumed
+by the existing `calibrate_linear` filter. It must contain at least two appropriate
+measured input/output points. There is no `ct_calibration` scalar substitution or
+built-in physically verified calibration. See [firmware configuration](esphome/README.md).
 
-## Calibration Procedure
-
-1. **Connect known load** (e.g., 2000W heater = ~8.7A at 230V)
-2. **Monitor raw ADC** via ESPHome logs or MQTT
-3. **Calculate calibration**: `calibration = known_current / measured_voltage`
-4. **Update `ct_calibration`** substitution and re-flash
-5. **Verify** power reading matches expected value
+The template computes a current-based estimate using nominal 230 V and power factor
+1. It does not establish true RMS current, actual real power or import/export
+polarity. The existing ADC and energy algorithms remain unqualified until verified
+against the installed hardware and suitable reference instrumentation. Do not use
+synthetic CI values as meter calibration or evidence of safe controller operation.
 
 ### Using ADS1115 (Optional)
 

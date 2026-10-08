@@ -13,6 +13,8 @@ Publishes ESPHome current-transformer measurements as a Victron D-Bus grid meter
 
 ### Maintenance
 
+- Validate and compile the ESPHome 2026.9.1 firmware with synthetic secrets; require an operator calibration table, express kWh conversion explicitly and use the supported initial switch state.
+
 - Verify hashes for locked CI, security-tool, release-build and container Python dependencies; build local packages without resolving an isolated backend.
 - Preserve exception tracebacks for D-Bus writes and MQTT connection/message failures, and send installer errors to stderr.
 - Publish reviewed release notes from the exact source commit used to build each candidate, preserving build provenance.
@@ -20,11 +22,11 @@ Publishes ESPHome current-transformer measurements as a Victron D-Bus grid meter
 
 ### Upgrade
 
-Contributors should recreate their check environment with `bash scripts/ci.sh --install` after updating the lock and exported requirements together. Container builders require supported prebuilt dependency wheels. These maintenance changes do not introduce a configuration or data migration. Retain local configuration and credentials when using the documented update procedure. Validate the candidate on an isolated system before production use; automated checks do not establish hardware acceptance.
+Contributors should recreate their check environment with `bash scripts/ci.sh --install` after updating the lock and exported requirements together. Container builders require supported prebuilt dependency wheels. The firmware configuration now requires `ct_calibration_points` in local secrets and encrypted OTA. Existing password-OTA devices need the documented two-stage migration or serial provisioning; preserve their existing API key. See `esphome/README.md` before any update. Retain local configuration and credentials when using the documented update procedure. Validate the candidate on an isolated system before production use; automated checks do not establish hardware acceptance.
 
 ### Security
 
-Private vulnerability reporting and response policy are documented in SECURITY.md. This maintenance update strengthens release evidence and review instructions; it does not replace deployment authentication, network isolation or independent equipment safeguards. No new project CVE is announced by these changes.
+New firmware builds require authenticated encrypted OTA, with no plaintext fallback in the final profile. The transitional first migration upload can still expose embedded secrets; prefer serial or a controlled trusted network. MQTT remains a separate local-network boundary. Private vulnerability reporting and response policy are documented in SECURITY.md. This maintenance update strengthens release evidence and review instructions; it does not replace deployment authentication, network isolation or independent equipment safeguards. No new project CVE is announced by these changes.
 
 ## [1.0.2] - 2026-09-12
 

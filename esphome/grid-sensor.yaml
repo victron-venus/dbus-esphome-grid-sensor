@@ -12,13 +12,14 @@
 #   - Optional: ADS1115 ADC for better resolution (16-bit vs ESP32 12-bit)
 #
 # Calibration:
-#   - Measure known load, adjust `ct_calibration` until reading matches
+#   - Supply your measured ct_calibration_points in secrets.yaml; no defaults are calibrated
 #   - Typical SCT-013: 100A = 50mA, burden 33Ω → 1.65V at 100A
 #   - ESP32 ADC: 3.3V = 4095 counts → ~24.4 mA/bit (single-ended)
 #   - With ADS1115: ±2.048V range, 16-bit → ~0.0625 mV/LSB
 
 esphome:
   name: grid-sensor
+  min_version: 2026.9.1
   friendly_name: "Grid Power Sensor"
   project:
     name: "victron-venus.dbusesp-grid-sensor"
@@ -65,7 +66,7 @@ api:
 # OTA Updates
 ota:
   platform: esphome
-  password: !secret ota_password
+  encryption:
 
 # MQTT Client
 mqtt:
@@ -113,12 +114,9 @@ sensor:
     filters:
       - sliding_window_moving_average:
           window_size: 10
-      - calibrate_linear:
-          - 0.0 -> 0.0
-          # Calibrate: measure known current, adjust second point
-          # Example: 10A measured -> 2.1V, 100A -> 3.3V (clipped)
-          # - 2.1 -> 10.0
-    # Calibration formula: A = (V - Voffset) * scale
+      # Supply measured calibration points; the repository provides no physical calibration.
+      - calibrate_linear: !secret ct_calibration_points
+    # An operator calibration may model A = (V - Voffset) * scale; validate the sensor physically.
     # For SCT-013-000 with 33Ω burden: 100A = 50mA = 1.65V
     # Voffset ≈ 1.65V (mid-supply), scale = 100A / (3.3V - 1.65V) = 60.6 A/V
     # Better: measure and calibrate at known loads
@@ -161,9 +159,9 @@ sensor:
     accuracy_decimals: 0
     update_interval: 1s
     lambda: |
-      // Calculate real power: P = V * I * PF
-      // Using nominal 230V and measured current (RMS)
-      // For better accuracy, add voltage sensor
+      // Estimate P = V * I * PF from the configured current conversion and nominal values.
+      // This template does not establish true RMS, real power or flow direction.
+      // Physical acceptance and appropriate sensing are required before control use.
       float current = id(grid_current_adc).state;
       float voltage = 230.0;  // Nominal voltage - replace with voltage sensor
       float pf = 1.0;         // Power factor - assume 1.0 for resistive
@@ -174,7 +172,8 @@ sensor:
     name: "Grid Energy Forward"
     id: grid_energy_forward
     sensor: grid_power
-    unit_prefix: k
+    filters:
+      - multiply: 0.001  # Wh -> kWh
     time_unit: h
     unit_of_measurement: "kWh"
     device_class: energy
@@ -187,7 +186,6 @@ sensor:
     name: "Grid Energy Reverse"
     id: grid_energy_reverse
     sensor: grid_power
-    unit_prefix: k
     time_unit: h
     unit_of_measurement: "kWh"
     device_class: energy
@@ -195,6 +193,7 @@ sensor:
     restore: true
     icon: "mdi:flash"
     filters:
+      - multiply: 0.001  # Wh -> kWh, before the existing sign filter
       - lambda: |
           // Only integrate negative power (feed-in)
           if (x < 0) return -x;
@@ -264,7 +263,7 @@ switch:
     name: "MQTT Publishing"
     id: mqtt_publishing
     optimistic: true
-    initial_state: true
+    restore_mode: ALWAYS_ON
     turn_on_action:
       - mqtt.publish:
           topic: "grid-sensor/control"
