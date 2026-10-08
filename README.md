@@ -2,7 +2,7 @@
 
 [![GitHub Release](https://img.shields.io/github/v/release/victron-venus/dbus-esphome-grid-sensor?label=version)](https://github.com/victron-venus/dbus-esphome-grid-sensor/releases)
 [![License: MIT](https://img.shields.io/github/license/victron-venus/dbus-esphome-grid-sensor)](LICENSE)
-[![Python Version](https://img.shields.io/badge/python-3.11%2B-blue)](pyproject.toml)
+[![Python Version](https://img.shields.io/badge/python-3.12-blue)](pyproject.toml)
 [![ESPHome](https://img.shields.io/badge/ESPHome-2024.0%2B-2496ED?logo=esphome&logoColor=white)](https://esphome.io/)
 [![Victron Venus OS](https://img.shields.io/badge/Victron-Venus%20OS-orange)](https://www.victronenergy.com/live/venus-os:start)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
@@ -466,3 +466,9 @@ without valid power, instantaneous measurements become invalid and `/Connected`
 becomes zero. Freshness starts when MQTT receives the sample, so time spent in
 the GLib queue cannot extend it. A new valid power sample restores the meter.
 Broker reconnection is asynchronous and does not prevent the D-Bus loop from running.
+
+## Contributing and security
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for reports, development checks and pull requests,
+[SECURITY.md](SECURITY.md) for private vulnerability reporting and deployment trust boundaries,
+and the [OpenSSF evidence index](docs/openssf-evidence.md) for assessment references and remaining verification.
