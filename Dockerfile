@@ -1,16 +1,18 @@
 FROM ubuntu:24.04@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55 AS builder
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-venv ca-certificates \
+    ca-certificates python3 python3-venv \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
 COPY pyproject.toml README.md LICENSE ./
 COPY src/ ./src/
 COPY .github/requirements-release-build.txt .github/requirements-runtime.txt ./.github/
 RUN python3 -m venv /opt/build-venv \
-    && /opt/build-venv/bin/pip install --no-cache-dir --require-hashes --only-binary=:all: -r .github/requirements-release-build.txt \
+    && /opt/build-venv/bin/pip install --no-cache-dir --require-hashes \
+        --only-binary=:all: -r .github/requirements-release-build.txt \
     && /opt/build-venv/bin/python -m build --no-isolation --wheel --outdir /tmp/wheels . \
     && python3 -m venv --system-site-packages /opt/venv \
-    && /opt/venv/bin/pip install --no-cache-dir --require-hashes --only-binary=:all: -r .github/requirements-runtime.txt \
+    && /opt/venv/bin/pip install --no-cache-dir --require-hashes \
+        --only-binary=:all: -r .github/requirements-runtime.txt \
     && /opt/venv/bin/pip install --no-cache-dir --no-deps --no-index /tmp/wheels/*.whl
 # Official Victron sources, with their license, pinned independently of the host.
 ADD --checksum=sha256:ad4c7501085153c7b0dd838dab531782e835d5828bf8afe0cb82e5edb0179710 \
@@ -22,9 +24,9 @@ RUN mkdir /opt/velib_python \
 FROM ubuntu:24.04@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55
 # Use Ubuntu's Python 3.12 interpreter with its matching native GI and D-Bus bindings.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-dbus python3-gi gir1.2-glib-2.0 \
-    && rm -rf /var/lib/apt/lists/*
-RUN groupadd -r appuser && useradd -r -g appuser appuser
+    gir1.2-glib-2.0 python3 python3-dbus python3-gi \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -r appuser && useradd -r -g appuser appuser
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /opt/velib_python /opt/velib_python
 ENV PATH="/opt/venv/bin:$PATH" \
