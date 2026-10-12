@@ -31,6 +31,13 @@
         "ecosystem": "pep440"
       },
       {
+        "path": "uv.lock",
+        "format": "uv-lock",
+        "value": "package",
+        "package": "dbus-esphome-grid-sensor",
+        "ecosystem": "pep440"
+      },
+      {
         "path": "src/dbus_grid_service.py",
         "format": "python",
         "value": "package",
