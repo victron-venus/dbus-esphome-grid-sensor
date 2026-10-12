@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Retain existing API credentials and calibration data. Password-OTA devices require the documented two-stage migration or serial provisioning before adopting the encrypted profile; see `esphome/README.md`. Firmware compilation and offline tests do not replace hardware validation. This cycle uses a new base version rather than the existing 1.0.4 release tag.
 
+### Security
+
+Use deployment-specific encrypted OTA and API keys; the checked-in examples and CI validation use synthetic values only. Keep existing credentials out of committed configuration and preserve the encrypted transport requirements during migration.
+
 ## [1.0.4] - Development line
 
 ### Release overview
