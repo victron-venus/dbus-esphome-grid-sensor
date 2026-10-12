@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.5] - Development line
+
+### Changed
+
+- Require encrypted OTA in the pinned ESPHome firmware profile and validate the example using synthetic secrets and an explicit calibration table.
+- Preserve D-Bus and MQTT failure tracebacks, validate configuration and package paths, and use hash-locked build and security dependencies.
+- Interpret GitHub response status from authoritative HTTP headers during release publication.
+
+### Upgrade
+
+Retain existing API credentials and calibration data. Password-OTA devices require the documented two-stage migration or serial provisioning before adopting the encrypted profile; see `esphome/README.md`. Firmware compilation and offline tests do not replace hardware validation. This cycle uses a new base version rather than the existing 1.0.4 release tag.
+
+### Security
+
+Use deployment-specific encrypted OTA and API keys; the checked-in examples and CI validation use synthetic values only. Keep existing credentials out of committed configuration and preserve the encrypted transport requirements during migration.
+
 ## [1.0.4] - Development line
 
 ### Release overview
