@@ -1,5 +1,7 @@
 # dbus-esphome-grid-sensor
 
+[![Fuzzing: RC only](https://img.shields.io/badge/Fuzzing-RC%20only-blue)](docs/fuzzing.md)
+
 [![GitHub Release](https://img.shields.io/github/v/release/victron-venus/dbus-esphome-grid-sensor?label=version)](https://github.com/victron-venus/dbus-esphome-grid-sensor/releases)
 [![License: MIT](https://img.shields.io/github/license/victron-venus/dbus-esphome-grid-sensor)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.12-blue)](pyproject.toml)
@@ -456,3 +458,9 @@ Broker reconnection is asynchronous and does not prevent the D-Bus loop from run
 See [CONTRIBUTING.md](CONTRIBUTING.md) for reports, development checks and pull requests,
 [SECURITY.md](SECURITY.md) for private vulnerability reporting and deployment trust boundaries,
 and the [OpenSSF evidence index](docs/openssf-evidence.md) for assessment references and remaining verification.
+
+## Release-candidate fuzzing
+
+The production MQTT sample normalizer receives synthetic scalar and object payloads. It must expose only known fields with finite values. Import-only hardware shims raise if invoked; no D-Bus service or MQTT handler is constructed.
+
+[RC-only fuzzing policy, local reproduction and failure handling](docs/fuzzing.md).
