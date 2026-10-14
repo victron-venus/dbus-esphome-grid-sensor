@@ -29,7 +29,24 @@
         "-max_len=4096"
       ],
       "seconds": 60,
-      "corpus": "fuzz/corpus/samples"
+      "corpus": "fuzz/corpus/samples",
+      "instrumentation": [
+        {
+          "module": "dbus_grid_service",
+          "functions": [
+            "normalize_payload",
+            "validate_sample"
+          ]
+        }
+      ]
     }
+  ],
+  "preflight-paths": [
+    ".github/requirements-fuzz.in",
+    "Dockerfile",
+    "fuzz",
+    "pyproject.toml",
+    "src",
+    "uv.lock"
   ]
 }
