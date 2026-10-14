@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.5] - Development line
 
+### Release candidate validation
+
+- Require bounded fuzzing on public release candidates, with source-bound reports and retained diagnostics; beta and ordinary CI do not run mutation campaigns.
+
 ### Changed
 
 - Require encrypted OTA in the pinned ESPHome firmware profile and validate the example using synthetic secrets and an explicit calibration table.
