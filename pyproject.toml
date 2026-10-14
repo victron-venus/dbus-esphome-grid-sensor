@@ -94,6 +94,8 @@ source = ["src"]
 omit = ["tests/*", "*/__pycache__/*"]
 
 [tool.coverage.report]
+# Keep the application coverage boundary when shared CI supplies --cov=.
+include = ["src/*"]
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",
