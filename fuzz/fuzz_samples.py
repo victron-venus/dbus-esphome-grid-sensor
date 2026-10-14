@@ -30,7 +30,7 @@ sys.modules["vedbus"].__dict__["VeDbusService"] = forbidden
 sys.path.insert(0, str(ROOT / "src"))
 
 with instrument_imports():
-    from dbus_grid_service import normalize_payload
+    from dbus_grid_service import MQTT_TOPIC_PREFIX, normalize_payload
 
 
 def test_one_input(data: bytes) -> None:
@@ -39,7 +39,7 @@ def test_one_input(data: bytes) -> None:
     except (ValueError, RecursionError):
         return
     try:
-        sample = normalize_payload("grid-sensor/power", value)
+        sample = normalize_payload(f"{MQTT_TOPIC_PREFIX.rstrip('/')}/power", value)
     except (ValueError, TypeError, OverflowError):
         return
     assert set(sample) <= {
