@@ -30,6 +30,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "types-atheris>=3.1.0.20260630",
     "python-dotenv>=1.0.0",  # Compatibility checks for existing configuration files
     "build>=1.2",
     "setuptools>=68",

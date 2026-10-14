@@ -29,3 +29,9 @@ release-assets/
 esphome/secrets.yaml
 esphome/.esphome/
 esphome/build/
+
+# Isolated RC fuzz runtime and local diagnostic inputs
+.fuzz-venv/
+crash-*
+timeout-*
+oom-*
