@@ -1,3 +1,9 @@
 include install.sh
 include CHANGELOG.md
 include service/run
+
+include CONTRIBUTING.md SECURITY.md GOVERNANCE.md CODE_OF_CONDUCT.md
+recursive-include docs *.md
+include esphome/README.md esphome/grid-sensor.yaml esphome/secrets.yaml.example
+global-exclude secrets.yaml
+recursive-include tests *.py
