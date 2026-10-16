@@ -86,3 +86,5 @@ Toolkit revision `d8089003f43637ee420fa4cbcccdf11f5d21e469` also rejects empty M
 ## Current firmware-inclusive review
 
 [Service and firmware assurance](firmware-assurance.md) distinguishes maintained source analysis, pinned third-party firmware, encrypted management and plaintext MQTT. See [governance](../GOVERNANCE.md), [conduct policy](../CODE_OF_CONDUCT.md) and [roadmap](roadmap.md).
+
+The optional GitHub status/release helper uses the verified [GitHub CLI TLS profile](release-tls-profile.md). Native host checks require Clang/clang++ with its static analyzer, AddressSanitizer and UndefinedBehaviorSanitizer runtime libraries. These tools are available on the supported GitHub-hosted Ubuntu runner; an operator-provided runner must install them before validation. Missing tooling fails the test rather than skipping analysis.
