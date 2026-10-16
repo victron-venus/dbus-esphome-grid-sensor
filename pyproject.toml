@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68.0", "wheel"]
+requires = ["setuptools>=77.0.3", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,14 +7,14 @@ name = "dbus-esphome-grid-sensor"
 version = "1.0.6"
 description = "ESP32 CT Grid Sensor with D-Bus service for Victron Venus OS"
 readme = "README.md"
-license = {file = "LICENSE"}
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     {name = "victron-venus contributors", email = "alvit.work+4alvit@gmail.com"}
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
     "Topic :: Home Automation",
@@ -33,7 +33,7 @@ dev = [
     "types-atheris>=3.1.0.20260630",
     "python-dotenv>=1.0.0",  # Compatibility checks for existing configuration files
     "build>=1.2",
-    "setuptools>=68",
+    "setuptools>=77.0.3",
     "wheel",
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
@@ -63,6 +63,8 @@ asyncio_mode = "auto"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+
+[tool.ruff.lint]
 select = [
     "E",   # pycodestyle
     "F",   # pyflakes

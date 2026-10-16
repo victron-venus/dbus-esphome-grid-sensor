@@ -266,7 +266,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0" },
     { name = "python-dotenv", marker = "extra == 'dev'", specifier = ">=1.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.5.0" },
-    { name = "setuptools", marker = "extra == 'dev'", specifier = ">=68" },
+    { name = "setuptools", marker = "extra == 'dev'", specifier = ">=77.0.3" },
     { name = "types-atheris", marker = "extra == 'dev'", specifier = ">=3.1.0.20260630" },
     { name = "wheel", marker = "extra == 'dev'" },
 ]

@@ -1,5 +1,7 @@
 # dbus-esphome-grid-sensor
 
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15571/badge)](https://www.bestpractices.dev/projects/15571)
+
 [![Fuzzing: RC only](https://img.shields.io/badge/Fuzzing-RC%20only-blue)](docs/fuzzing.md)
 
 [![GitHub Release](https://img.shields.io/github/v/release/victron-venus/dbus-esphome-grid-sensor?label=version)](https://github.com/victron-venus/dbus-esphome-grid-sensor/releases)

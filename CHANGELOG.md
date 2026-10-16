@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Modernize PEP 639 license metadata and Ruff configuration without dropping lint rules.
+- Analyze and execute all maintained firmware lambdas with native memory instrumentation.
+- Document governance, continuity limits and firmware/broker trust boundaries.
+
 - Validate each public release candidate with bounded, network-isolated fuzz campaigns against its exact source revision.
 - Require positive engine execution counts, instrumented production code and validated seed corpora; retain source-bound reports and diagnostic evidence.
 - Run deterministic seed and configuration checks in ordinary CI without starting mutation campaigns on betas.
