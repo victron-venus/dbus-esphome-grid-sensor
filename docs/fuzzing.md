@@ -1,5 +1,9 @@
 # Release-candidate fuzz testing
 
+See the [illustrated RC fuzzing process and verified rollout results](https://github.com/victron-venus/venus-os-ci-toolkit/blob/main/docs/rc-fuzzing-results.md)
+for the shared release flow, evidence requirements and a dated cross-project
+snapshot. The project-specific scope and reproduction guidance below still apply.
+
 ## Scope and assertions
 
 **samples.** The production MQTT sample normalizer receives synthetic scalar and object payloads. It must expose only known fields with finite values. Import-only hardware shims raise if invoked; no D-Bus service or MQTT handler is constructed.
