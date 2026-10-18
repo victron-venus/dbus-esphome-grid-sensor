@@ -223,7 +223,7 @@ wheels = [
 
 [[package]]
 name = "dbus-esphome-grid-sensor"
-version = "1.0.7"
+version = "1.0.8"
 source = { editable = "." }
 dependencies = [
     { name = "paho-mqtt" },
