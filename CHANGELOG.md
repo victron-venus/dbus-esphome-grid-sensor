@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Route Dependabot metadata approval through the trusted default branch while preserving the existing author and review policy.
 - Prepare the metadata automation maintenance release.
 
 ### Upgrade
