@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.9] - Unreleased
+
+### Changed
+
+- Update the locked Ruff toolchain to 0.17.1 and synchronize the CI requirements export.
+- Install local validation dependencies from the same committed uv lock used by shared CI.
+- Refresh pinned CI workflows and the patched Scorecard runtime.
+
+### Upgrade
+
+Use the existing upgrade procedure and preserve configuration. This maintenance
+release does not change the sensor protocol or require a data migration.
+
 ## [1.0.8] - 2026-10-18
 
 ### Changed

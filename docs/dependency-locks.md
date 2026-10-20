@@ -5,9 +5,12 @@ Python 3.12. The `build` dependency group includes the package frontend and
 backend; `security` includes Bandit. CI and container installs verify the hashes
 in the exported requirements files before installing third-party artifacts.
 
-`bash scripts/ci.sh --install` creates the local check environment from
-`.github/requirements-ci.txt`, then installs this checkout without dependency
-resolution or build isolation. Package release builds also disable isolation
+`bash scripts/ci.sh --install` creates the local check environment directly from
+`uv.lock`, selecting the `dev` extra and the `build` and `security` groups with
+locked, wheel-only dependency installation. It then installs this checkout
+without dependency resolution or build isolation. Exported requirements remain
+required for the workflows and container stages that consume them; regenerate
+them whenever the lock changes. Package release builds also disable isolation
 and use the installed, locked build backend. Local source is built from the
 reviewed checkout; it is not a downloaded dependency with a registry hash.
 
