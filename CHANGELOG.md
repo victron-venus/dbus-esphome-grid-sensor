@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Use the existing upgrade procedure and preserve configuration. This maintenance
 release does not change the sensor protocol or require a data migration.
 
+### Security
+
+Retain the documented TLS, OTA and MQTT broker protections when updating.
+The tooling updates preserve those trust requirements and the existing
+dependency and secret scans. A published beta does not establish acceptance
+of a particular physical sensor or firmware installation.
+
 ## [1.0.8] - 2026-10-18
 
 ### Changed
