@@ -279,7 +279,7 @@ class _StubProperties:
 
 
 def _mqtt_message(topic: str, payload: dict[str, Any]):
-    msg = types.SimpleNamespace(topic=topic, payload=json.dumps(payload).encode())
+    msg = types.SimpleNamespace(topic=topic, payload=json.dumps(payload).encode(), retain=False)
     return msg
 
 
@@ -556,3 +556,109 @@ def test_stale_clears_frequency_with_other_instantaneous(dgs):
     assert paths["/Ac/L1/Voltage"] is None
     assert paths["/Ac/L1/Current"] is None
     assert paths["/Ac/Frequency"] is None
+
+
+def _deliver(handler, suffix, payload, *, retained):
+    message = svc.mqtt.MQTTMessage(topic=f"grid-sensor/{suffix}".encode())
+    message.payload = json.dumps(payload).encode()
+    message.retain = retained
+    handler._on_message(handler.client, None, message)
+    return message
+
+
+@pytest.mark.parametrize("suffix", ["power", "sensor/grid_power/state"])
+def test_retained_power_cannot_establish_first_measurement(dgs, monkeypatch, suffix):
+    monkeypatch.setattr(svc.time, "monotonic", lambda: 100.0)
+    handler = svc.MQTTHandler(dgs)
+    previous_update = dgs.data.last_update
+    _deliver(handler, suffix, 999, retained=True)
+    assert dgs.data.last_update == previous_update
+    assert dgs.dbus_service.paths["/Connected"] == 0
+    assert dgs.dbus_service.paths["/Ac/Power"] is None
+    _deliver(handler, suffix, 12, retained=False)
+    assert dgs.data.last_update == 100.0
+    assert dgs.dbus_service.paths["/Connected"] == 1
+    assert dgs.dbus_service.paths["/Ac/Power"] == 12
+
+
+@pytest.mark.parametrize("disconnect", ["availability", "broker"])
+def test_retained_replay_after_disconnect_requires_live_recovery(dgs, monkeypatch, disconnect):
+    now = [100.0]
+    monkeypatch.setattr(svc.time, "monotonic", lambda: now[0])
+    handler = svc.MQTTHandler(dgs)
+    _deliver(handler, "power", 12, retained=False)
+    if disconnect == "availability":
+        _deliver(handler, "status", {"status": "offline"}, retained=True)
+    else:
+        handler._on_disconnect(handler.client, None, None, 0, None)
+        handler._on_connect(handler.client, None, None, 0, None)
+    now[0] = 110.0
+    _deliver(handler, "status", {"status": "online"}, retained=True)
+    _deliver(handler, "power", 999, retained=True)
+    assert dgs.data.last_update == 100.0
+    assert dgs.data.power == 12
+    assert dgs.dbus_service.paths["/Connected"] == 0
+    assert dgs.dbus_service.paths["/Ac/Power"] is None
+    _deliver(handler, "power", 14, retained=False)
+    assert dgs.data.last_update == 110.0
+    assert dgs.dbus_service.paths["/Connected"] == 1
+    assert dgs.dbus_service.paths["/Ac/Power"] == 14
+
+
+def test_retained_instantaneous_values_preserve_live_reading_and_deadline(dgs, monkeypatch):
+    now = [100.0]
+    monkeypatch.setattr(svc.time, "monotonic", lambda: now[0])
+    handler = svc.MQTTHandler(dgs)
+    _deliver(
+        handler,
+        "state",
+        {"power": 12, "voltage": 120, "current": 1, "frequency": 60},
+        retained=False,
+    )
+    now[0] = 125.0
+    _deliver(
+        handler,
+        "state",
+        {
+            "power": 999,
+            "voltage": 200,
+            "current": 9,
+            "frequency": 50,
+            "energy_forward": 23,
+            "energy_reverse": 4,
+            "status": "online",
+        },
+        retained=True,
+    )
+    assert dgs.data.last_update == 100.0
+    assert (dgs.data.power, dgs.data.voltage, dgs.data.current, dgs.data.frequency) == (
+        12,
+        120,
+        1,
+        60,
+    )
+    assert dgs.dbus_service.paths["/Ac/Energy/Forward"] == 23
+    assert dgs.dbus_service.paths["/Ac/Energy/Reverse"] == 4
+    assert dgs.dbus_service.paths["/Connected"] == 1
+    now[0] = 130.001
+    dgs.check_connection_timeout()
+    assert dgs.dbus_service.paths["/Connected"] == 0
+    assert dgs.dbus_service.paths["/Ac/Power"] is None
+
+
+def test_retained_flag_is_captured_before_glib_dispatch(dgs, monkeypatch):
+    pending = []
+    monkeypatch.setattr(
+        svc.GLib, "idle_add", lambda callback, *args: pending.append((callback, args))
+    )
+    handler = svc.MQTTHandler(dgs)
+    message = _deliver(
+        handler, "state", {"power": 999, "voltage": 230, "energy_forward": 23}, retained=True
+    )
+    message.retain = False
+    callback, args = pending.pop()
+    assert callback(*args) is False
+    assert dgs.dbus_service.paths["/Connected"] == 0
+    assert dgs.dbus_service.paths["/Ac/Power"] is None
+    assert dgs.data.voltage is None
+    assert dgs.dbus_service.paths["/Ac/Energy/Forward"] == 23

@@ -448,11 +448,18 @@ MIT License - see [LICENSE](LICENSE) for details.
 The default bus name is `com.victronenergy.grid.esphome_42`; a name component
 cannot begin with a digit. All required paths are created before name
 registration. MQTT callbacks hand updates to the GLib thread and subscribe once
-to the topic prefix. A power sample establishes freshness. Availability and
+to the topic prefix. A non-retained power sample establishes freshness. Availability and
 energy-counter messages cannot keep an old power value online. After 30 seconds
 without valid power, instantaneous measurements become invalid and `/Connected`
 becomes zero. Freshness starts when MQTT receives the sample, so time spent in
 the GLib queue cannot extend it. A new valid power sample restores the meter.
+Broker-retained power, voltage, current and frequency have no verifiable
+measurement age and are ignored. They neither overwrite live readings nor
+refresh the timeout or reconnect the meter. Retained availability and cumulative
+energy counters are still accepted; an online status alone is not a measurement.
+After startup or reconnect, the publisher must deliver a live, non-retained power
+observation before power becomes valid. This does not imply that the supplied
+ESPHome template retains power by default.
 Broker reconnection is asynchronous and does not prevent the D-Bus loop from running.
 
 ## Contributing and security

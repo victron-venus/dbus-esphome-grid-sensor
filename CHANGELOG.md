@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.9] - Unreleased
 
+### Fixed
+
+- Ignore broker-retained instantaneous readings without a trustworthy sample age,
+  preserving live values and their original freshness deadline. Retained offline
+  status and cumulative energy counters remain supported; a live power observation
+  is required to reconnect the meter after startup or availability loss.
+
 ### Changed
 
 - Update the locked Ruff toolchain to 0.17.1 and synchronize the CI requirements export.
@@ -16,9 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Upgrade
 
 Use the existing upgrade procedure and preserve configuration. This maintenance
-release does not change the sensor protocol or require a data migration.
+release requires live non-retained power delivery to establish measurement
+freshness; retained replay alone is insufficient. It does not change the sensor
+protocol or require a data migration.
 
 ### Security
+
+- Refresh the locked certifi trust store to 2026.10.19 and virtualenv to 21.14.9
+  to address published security advisories.
 
 Retain the documented TLS, OTA and MQTT broker protections when updating.
 The tooling updates preserve those trust requirements and the existing

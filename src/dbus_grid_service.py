@@ -183,15 +183,23 @@ class DBusGridService:
         logger.info(f"D-Bus service registered: {self.service_name}")
 
     def update_from_mqtt(
-        self, topic: str, payload: Any, *, received_at: float | None = None
+        self, topic: str, payload: Any, *, received_at: float | None = None, retained: bool = False
     ) -> None:
         """Accept flat JSON objects, per-topic numbers, and ESPHome state topics.
 
         This runs on the GLib thread. Only a valid power sample refreshes the
-        meter's freshness; availability and energy counters cannot keep old
-        instantaneous power online indefinitely.
+        meter's freshness; availability, energy counters and broker-retained
+        instantaneous readings cannot establish a new measurement.
         """
         payload = normalize_payload(topic, payload)
+        if retained:
+            # Broker replay has no trustworthy measurement time. Keep cumulative
+            # counters and availability, but never replay instantaneous readings.
+            payload = {
+                key: value
+                for key, value in payload.items()
+                if key in ("energy_forward", "energy_reverse", "status")
+            }
         values = {key: value for key, value in payload.items() if key != "status"}
         with self._lock:
             for name, value in values.items():
@@ -330,16 +338,18 @@ class MQTTHandler:
 
             logger.debug(f"MQTT: {topic} = {payload}")
             # Only GLib may access the D-Bus connection.
-            GLib.idle_add(self._apply_message, topic, payload, received_at)
+            GLib.idle_add(self._apply_message, topic, payload, received_at, bool(msg.retain))
 
         except json.JSONDecodeError:
             logger.warning("Invalid JSON on %s: %r", msg.topic, msg.payload)
         except Exception as e:
             logger.exception("Error processing MQTT message: %s", e)
 
-    def _apply_message(self, topic: str, payload: Any, received_at: float) -> bool:
+    def _apply_message(self, topic: str, payload: Any, received_at: float, retained: bool) -> bool:
         try:
-            self.dbus_service.update_from_mqtt(topic, payload, received_at=received_at)
+            self.dbus_service.update_from_mqtt(
+                topic, payload, received_at=received_at, retained=retained
+            )
         except (TypeError, ValueError) as exc:
             logger.warning("Invalid grid measurement on %s: %s", topic, exc)
         return False
