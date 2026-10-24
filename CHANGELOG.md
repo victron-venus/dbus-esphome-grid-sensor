@@ -29,8 +29,9 @@ protocol or require a data migration.
 
 ### Security
 
-- Refresh the locked certifi trust store to 2026.10.19 and virtualenv to 21.14.9
-  to address published security advisories.
+- Refresh the locked certifi trust store to 2026.10.19.
+- Update development tools to virtualenv 21.14.13 and filelock 4.2.1 to address
+  CVE-2026-115586 (Bash prompt expansion) and CVE-2026-112940 (lock-database paths).
 
 Retain the documented TLS, OTA and MQTT broker protections when updating.
 The tooling updates preserve those trust requirements and the existing
