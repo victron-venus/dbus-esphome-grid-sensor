@@ -5,7 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.9] - Unreleased
+## [1.0.10] - Unreleased
+
+### Changed
+
+- Refresh the pinned Ubuntu 24.04 base image used by both container build and runtime stages.
+- Synchronize the package build toolchain on setuptools 84.2.1 and the CI environment on Ruff 0.17.2.
+
+### Upgrade
+
+Use the existing upgrade procedure and preserve local configuration. The sensor
+protocol, application behavior and configuration format are unchanged; no data
+migration is required. Software and container checks do not establish physical
+sensor, firmware installation or live Venus OS acceptance.
+
+### Security
+
+The base-image and build-tool refresh preserves the existing dependency, secret
+and container scans. No new application vulnerability fix is claimed. Retain the
+documented TLS, OTA and MQTT broker protections when updating.
+
+## [1.0.9] - 2026-10-24
 
 ### Fixed
 
