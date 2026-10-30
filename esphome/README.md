@@ -1,5 +1,10 @@
 # Firmware build and security profile
 
+**Browser-first installation:** build your personalised factory image in ESPHome
+Device Builder, then install it through [ESPHome Web](https://web.esphome.io/).
+The [browser guide](../docs/browser-install.md) avoids installing a local compiler
+on the USB-connected computer; the configuration and calibration below still apply.
+
 The supported compiler is **ESPHome 2026.9.1**, upstream commit
 `0b2b16e664ecfc0add37f3435db1c2140b8a687e`. The build uses the official image
 `ghcr.io/esphome/esphome:2026.9.1@sha256:776a845d508909bf426d2ee7bdd81796361ebe6a7f091807ce1d6d0b48985413`.
