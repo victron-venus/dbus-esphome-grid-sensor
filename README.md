@@ -13,6 +13,15 @@
 
 ESP32-based Current Transformer (CT) sensor for monitoring household grid power, with a companion D-Bus service that registers it as a grid meter (`com.victronenergy.grid`) in Victron Venus OS.
 
+## Install the ESP32 from your browser
+
+Use **[ESPHome Web](https://web.esphome.io/)** with your own factory image,
+compiled by ESPHome Device Builder on Home Assistant or another server.
+[Browser installation instructions](docs/browser-install.md) cover device
+configuration, calibration, USB flashing and recovery. **GitHub release archives
+and Python packages install the Venus OS bridge, not the ESP32.** The synthetic
+CI firmware is not suitable for a real sensor.
+
 ## Python runtime
 
 Native Venus OS packages target **Python 3.12.x**. The audited Cerbo on Venus OS
