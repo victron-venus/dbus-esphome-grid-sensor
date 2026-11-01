@@ -18,8 +18,9 @@ would not remove that dependency.
 2. A scratch stage holds that bundle with mode `0644`, so Ubuntu's `_apt` sandbox
    can read it. Each package-install step receives it through a read-only bind
    mount at `/tmp/apt-bootstrap-ca.pem`.
-3. The installer selects signed Ubuntu Noble indexes: ordered security/archive
-   mirrors for amd64, and the official ports archive for other architectures.
+3. The installer selects signed Ubuntu Noble indexes: the Canonical archive and an
+   independently operated Kernel.org fallback for amd64, and the official ports
+   archive for other architectures.
    All URLs use HTTPS. `Signed-By` still requires Ubuntu's archive keyring.
 4. Only those APT invocations use the mounted bundle through
    `Acquire::https::CAInfo`. Installation includes Ubuntu's `ca-certificates`
@@ -31,6 +32,19 @@ TLS peer and hostname verification remain enabled. Package signature checks,
 strict index-update failure, two retries, 20-second transport timeouts, a
 60-second lock timeout, and the 180/360-second update/install deadlines remain
 in force. Temporary indexes are removed on success or failure.
+
+The amd64 list prefers `https://archive.ubuntu.com/ubuntu/` and falls back to
+`https://mirrors.kernel.org/ubuntu/`. Archive and security hostnames at Canonical
+can share a backend; a second name did not prevent the observed index-download
+timeouts. The [Linux Kernel Archives](https://mirrors.kernel.org/) operates the
+second service, whose archive is listed in [Ubuntu's official mirror registry](https://launchpad.net/ubuntu/+mirror/mirrors.us.kernel.org-archive).
+Use its current HTTPS endpoint, not the registry's legacy hostname, whose TLS
+certificate does not cover that name. Both endpoints supply all four Noble
+suites and remain subject to the same Ubuntu archive-keyring checks. Before
+changing the mirror list, check the operator, registry, certificate and suite
+availability with the pinned CA bundle, then run the real container build and
+offline import checks. A successful local request alone does not establish
+availability from a hosted runner.
 
 The Dockerfile requires BuildKit with Dockerfile syntax support for
 [`ADD --checksum`](https://docs.docker.com/reference/dockerfile/#add---checksum)
