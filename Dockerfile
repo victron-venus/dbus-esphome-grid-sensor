@@ -1,7 +1,8 @@
-FROM ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac AS builder
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates python3 python3-venv \
-    && rm -rf /var/lib/apt/lists/*
+FROM ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac AS apt-base
+COPY --chmod=755 scripts/install-container-deps.sh /usr/local/sbin/install-container-deps
+
+FROM apt-base AS builder
+RUN install-container-deps ca-certificates python3 python3-venv
 WORKDIR /build
 COPY pyproject.toml README.md LICENSE ./
 COPY src/ ./src/
@@ -21,11 +22,9 @@ RUN mkdir /opt/velib_python \
     && tar -xzf /tmp/velib.tar.gz --strip-components=1 -C /opt/velib_python \
     && rm /tmp/velib.tar.gz
 
-FROM ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac
+FROM apt-base
 # Use Ubuntu's Python 3.12 interpreter with its matching native GI and D-Bus bindings.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gir1.2-glib-2.0 python3 python3-dbus python3-gi \
-    && rm -rf /var/lib/apt/lists/* \
+RUN install-container-deps gir1.2-glib-2.0 python3 python3-dbus python3-gi \
     && groupadd -r appuser && useradd -r -g appuser appuser
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /opt/velib_python /opt/velib_python
