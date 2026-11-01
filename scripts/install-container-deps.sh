@@ -23,9 +23,10 @@ bootstrap_ca=/tmp/apt-bootstrap-ca.pem
 test -s "$bootstrap_ca"
 architecture=$(dpkg --print-architecture)
 if [ "$architecture" = amd64 ]; then
+    # Use an independent backend when Canonical archive/security hosts time out.
     printf '%s\t%s\n' \
-        'https://security.ubuntu.com/ubuntu/' 'priority:1' \
-        'https://archive.ubuntu.com/ubuntu/' 'priority:2' > "$apt_root/mirrors.txt"
+        'https://archive.ubuntu.com/ubuntu/' 'priority:1' \
+        'https://mirrors.kernel.org/ubuntu/' 'priority:2' > "$apt_root/mirrors.txt"
 else
     printf '%s\n' 'https://ports.ubuntu.com/ubuntu-ports/' > "$apt_root/mirrors.txt"
 fi

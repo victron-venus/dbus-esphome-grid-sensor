@@ -105,8 +105,8 @@ def test_amd64_strict_signed_sources_and_identical_options(tmp_path: Path) -> No
         "python3-dbus",
     ]
     assert calls[0]["mirrors"] == (
-        "https://security.ubuntu.com/ubuntu/\tpriority:1\n"
-        "https://archive.ubuntu.com/ubuntu/\tpriority:2\n"
+        "https://archive.ubuntu.com/ubuntu/\tpriority:1\n"
+        "https://mirrors.kernel.org/ubuntu/\tpriority:2\n"
     )
     assert "Signed-By:" in calls[0]["source"]
     assert "Suites: noble noble-updates noble-backports noble-security" in calls[0]["source"]
