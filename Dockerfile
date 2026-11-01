@@ -1,8 +1,13 @@
+FROM scratch AS apt-ca
+# Mozilla CA snapshot (MPL-2.0), used only by build-time APT; see docs/container-build.md.
+ADD --chmod=0644 --checksum=sha256:796f1389bfea13c0ed78f663b765baaff54a508e5483786bd6ece73c5e3e3cbe \
+    https://curl.se/ca/cacert-2026-10-20.pem /cacert.pem
+
 FROM ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac AS apt-base
 COPY --chmod=755 scripts/install-container-deps.sh /usr/local/sbin/install-container-deps
 
 FROM apt-base AS builder
-RUN install-container-deps ca-certificates python3 python3-venv
+RUN --mount=type=bind,from=apt-ca,source=/cacert.pem,target=/tmp/apt-bootstrap-ca.pem install-container-deps python3 python3-venv
 WORKDIR /build
 COPY pyproject.toml README.md LICENSE ./
 COPY src/ ./src/
@@ -24,7 +29,7 @@ RUN mkdir /opt/velib_python \
 
 FROM apt-base
 # Use Ubuntu's Python 3.12 interpreter with its matching native GI and D-Bus bindings.
-RUN install-container-deps gir1.2-glib-2.0 python3 python3-dbus python3-gi \
+RUN --mount=type=bind,from=apt-ca,source=/cacert.pem,target=/tmp/apt-bootstrap-ca.pem install-container-deps gir1.2-glib-2.0 python3 python3-dbus python3-gi \
     && groupadd -r appuser && useradd -r -g appuser appuser
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /opt/velib_python /opt/velib_python

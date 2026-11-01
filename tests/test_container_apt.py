@@ -25,6 +25,9 @@ def installer(tmp_path: Path, **changes: str) -> tuple[subprocess.CompletedProce
     (system / "sources.list").write_text("original source list")
     (system / "sources.list.d").mkdir()
     (system / "sources.list.d/ubuntu.sources").write_text("signed ports configuration")
+    bootstrap_ca = system / "bootstrap-ca.pem"
+    if changes.pop("bootstrap_ca", "yes") == "yes":
+        bootstrap_ca.write_text("fixture trust anchor")
     original = {p: p.read_bytes() for p in system.rglob("*") if p.is_file()}
     binary = tmp_path / "bin"
     binary.mkdir()
@@ -50,6 +53,7 @@ def installer(tmp_path: Path, **changes: str) -> tuple[subprocess.CompletedProce
     (binary / "timeout").symlink_to(timeout)
     text = (ROOT / "scripts/install-container-deps.sh").read_text()
     for before, after in (
+        ("/tmp/apt-bootstrap-ca.pem", str(bootstrap_ca)),
         ("/etc/os-release", str(system / "os-release")),
         ("/usr/share/keyrings/ubuntu-archive-keyring.gpg", str(keyring)),
         ("/etc/apt/sources.list", str(system / "sources.list")),
@@ -92,16 +96,17 @@ def test_amd64_strict_signed_sources_and_identical_options(tmp_path: Path) -> No
     assert len(calls) == 2
     assert calls[0]["options"] == calls[1]["options"]
     assert calls[0]["args"][-2:] == ["update", "--error-on=any"]
-    assert calls[1]["args"][-5:] == [
+    assert calls[1]["args"][-6:] == [
         "install",
         "--yes",
         "--no-install-recommends",
+        "ca-certificates",
         "python3",
         "python3-dbus",
     ]
     assert calls[0]["mirrors"] == (
-        "http://security.ubuntu.com/ubuntu/\tpriority:1\n"
-        "http://archive.ubuntu.com/ubuntu/\tpriority:2\n"
+        "https://security.ubuntu.com/ubuntu/\tpriority:1\n"
+        "https://archive.ubuntu.com/ubuntu/\tpriority:2\n"
     )
     assert "Signed-By:" in calls[0]["source"]
     assert "Suites: noble noble-updates noble-backports noble-security" in calls[0]["source"]
@@ -113,13 +118,15 @@ def test_amd64_strict_signed_sources_and_identical_options(tmp_path: Path) -> No
 
 
 @pytest.mark.parametrize("arch", ["arm64", "armhf"])
-def test_other_architectures_keep_image_sources(tmp_path: Path, arch: str) -> None:
-    """ARM images continue to use their original ports and trust configuration."""
+def test_other_architectures_use_signed_https_ports(tmp_path: Path, arch: str) -> None:
+    """ARM uses the same signed ports archive through verified TLS."""
     result, calls = installer(tmp_path, arch=arch)
     assert result.returncode == 0, result.stderr
-    assert calls[0]["source"] == "original source list"
-    assert calls[0]["options"]["Dir::Etc::sourceparts"].endswith("system/sources.list.d")
-    assert "mirrors" not in calls[0]
+    assert calls[0]["mirrors"] == "https://ports.ubuntu.com/ubuntu-ports/\n"
+    assert f"Architectures: {arch}" in calls[0]["source"]
+    assert "Signed-By:" in calls[0]["source"]
+    assert calls[0]["options"]["Dir::Etc::sourceparts"] == "-"
+    assert calls[0]["options"] == calls[1]["options"]
 
 
 def test_failed_update_prevents_installation(tmp_path: Path) -> None:
@@ -148,6 +155,7 @@ def test_slow_update_has_finite_timeout(tmp_path: Path) -> None:
     [
         {"os_release": "ID=ubuntu\nVERSION_CODENAME=resolute\n"},
         {"keyring": "no"},
+        {"bootstrap_ca": "no"},
         {"no_packages": "yes"},
     ],
 )
@@ -169,11 +177,40 @@ def test_container_preserves_packages_and_native_import_contract() -> None:
     )
     assert "FROM apt-base AS builder" in dockerfile
     assert "FROM apt-base\n" in dockerfile
-    assert "RUN install-container-deps ca-certificates python3 python3-venv" in dockerfile
-    assert (
-        "RUN install-container-deps gir1.2-glib-2.0 python3 python3-dbus python3-gi" in dockerfile
-    )
+    assert "install-container-deps python3 python3-venv" in dockerfile
+    assert "install-container-deps gir1.2-glib-2.0 python3 python3-dbus python3-gi" in dockerfile
     assert (
         "RUN python -c 'import dbus_grid_service; from vedbus import VeDbusService'" in dockerfile
     )
     assert "USER appuser" in dockerfile
+
+
+def test_bootstrap_trust_is_local_to_apt_calls(tmp_path: Path) -> None:
+    """The CA override applies to both package calls without disabling TLS checks."""
+    result, calls = installer(tmp_path)
+    assert result.returncode == 0, result.stderr
+    for call in calls:
+        assert call["options"]["Acquire::https::CAInfo"] == str(
+            tmp_path / "system/bootstrap-ca.pem"
+        )
+        assert not any(
+            "Verify-Peer" in option or "Verify-Host" in option for option in call["options"]
+        )
+
+
+def test_bootstrap_is_digest_pinned_readable_and_not_in_runtime_layers() -> None:
+    """A read-only BuildKit mount supplies CAs independently of the minimal base."""
+    dockerfile = (ROOT / "Dockerfile").read_text()
+    assert dockerfile.startswith("FROM scratch AS apt-ca\n")
+    assert (
+        "ADD --chmod=0644 --checksum=sha256:796f1389bfea13c0ed78f663b765baaff54a508e5483786bd6ece73c5e3e3cbe"
+        in dockerfile
+    )
+    assert "https://curl.se/ca/cacert-2026-10-20.pem /cacert.pem" in dockerfile
+    assert (
+        dockerfile.count(
+            "RUN --mount=type=bind,from=apt-ca,source=/cacert.pem,target=/tmp/apt-bootstrap-ca.pem "
+        )
+        == 2
+    )
+    assert "COPY --from=apt-ca" not in dockerfile
