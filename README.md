@@ -378,6 +378,9 @@ system bus. `--systemd` remains available for hosts running systemd.
 
 ## Docker Deployment
 
+See [container build and trust](docs/container-build.md) for HTTPS package bootstrap,
+CA snapshot maintenance, and the CI import checks.
+
 The image installs the actual Python module, matching native GI/D-Bus bindings,
 and a checksum-verified revision of official Victron `velib_python` with its license.
 It does not require a sibling helper checkout. A reachable MQTT broker and access
