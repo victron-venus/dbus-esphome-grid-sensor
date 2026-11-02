@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -169,12 +170,11 @@ def test_invalid_prerequisites_stop_before_apt(tmp_path: Path, changes: dict[str
 def test_container_preserves_packages_and_native_import_contract() -> None:
     """Both stages reuse one pinned base while preserving production imports."""
     dockerfile = (ROOT / "Dockerfile").read_text()
-    assert (
-        dockerfile.count(
-            "ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac"
-        )
-        == 1
-    )
+    # Verify the immutable base contract without duplicating its updatable digest.
+    base_stages = re.findall(r"^FROM (\S+) AS apt-base$", dockerfile, re.MULTILINE)
+    assert len(base_stages) == 1
+    assert re.fullmatch(r"ubuntu:24\.04@sha256:[0-9a-f]{64}", base_stages[0])
+    assert len(re.findall(r"^FROM ubuntu:", dockerfile, re.MULTILINE)) == 1
     assert "FROM apt-base AS builder" in dockerfile
     assert "FROM apt-base\n" in dockerfile
     assert "install-container-deps python3 python3-venv" in dockerfile
