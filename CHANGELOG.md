@@ -5,11 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.10] - Unreleased
+## [1.0.11] - Unreleased
 
 ### Changed
 
-- Update pytest to 9.2.0 and mypy to 2.4.1, keeping all committed CI/runtime/build/security exports synchronized with the dependency lock.
+- Refresh the immutable Ubuntu 24.04 base used by both container build and runtime stages.
+- Keep the container contract tied to the Ubuntu release, digest pin and shared stages instead of duplicating an outdated digest in the test.
+- Synchronize pytest 9.2.0 and mypy 2.4.1 with the locked CI requirements.
+
+### Upgrade
+
+Use the existing installation procedure and preserve local configuration. No
+sensor protocol or configuration migration is required. Software checks do not
+replace physical sensor, firmware installation or live Venus OS acceptance.
+
+### Security
+
+The base remains pinned by its SHA-256 digest. Package, native import, non-root
+runtime and dependency scanning checks remain required; no new application
+vulnerability fix is claimed.
+
+## [1.0.10] - 2026-10-26
+
+### Changed
 
 - Refresh the pinned Ubuntu 24.04 base image used by both container build and runtime stages.
 - Synchronize the package build toolchain on setuptools 84.2.1 and the CI environment on Ruff 0.17.2.
