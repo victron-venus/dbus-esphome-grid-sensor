@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Update pytest to 9.2.0 and mypy to 2.4.1, keeping all committed CI/runtime/build/security exports synchronized with the dependency lock.
+
 - Refresh the pinned Ubuntu 24.04 base image used by both container build and runtime stages.
 - Synchronize the package build toolchain on setuptools 84.2.1 and the CI environment on Ruff 0.17.2.
 
