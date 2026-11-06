@@ -152,25 +152,10 @@ A local candidate package also needs the saved `.release-plan.json` at its exact
 
 ### Updating change-scope policy safely
 
-Use the [fixed scope-only generator](https://github.com/victron-venus/venus-os-ci-toolkit/commit/56863cf0beed5ab97c4f27d7adb5aedb83c758d5)
-from a clean checkout for recognized generated graphs:
+Follow the [shared CI Toolkit regeneration guide](https://github.com/victron-venus/venus-os-ci-toolkit/blob/main/docs/CHANGE_SCOPE.md#regenerate-documentation-scope-safely)
+from this repository's root. It defines the supported pinned generator, required
+clean-checkout checks, and scope-only update and verification commands.
 
-Set `TOOLKIT` to a clean checkout of the pinned revision and run this block
-from the consumer repository. A failed revision or working-tree check stops
-the subshell before either generator command runs.
-
-```sh
-(
-  set -eu
-  TOOLKIT=/path/to/fixed/venus-os-ci-toolkit
-  toolkit_head=$(git -C "$TOOLKIT" rev-parse HEAD)
-  test "$toolkit_head" = 56863cf0beed5ab97c4f27d7adb5aedb83c758d5
-  toolkit_status=$(git -C "$TOOLKIT" status --porcelain=v1 --untracked-files=all)
-  test -z "$toolkit_status"
-  python3 "$TOOLKIT/scripts/install_release.py" . --change-scope-only
-  python3 "$TOOLKIT/scripts/install_release.py" . --change-scope-only --check
-)
-```
 
 The policy's historical `toolkit_revision` records provenance; it does not select
 a safe regeneration tool. Do not rerun an older full generator just to update
