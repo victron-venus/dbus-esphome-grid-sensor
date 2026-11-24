@@ -3,7 +3,7 @@ FROM scratch AS apt-ca
 ADD --chmod=0644 --checksum=sha256:796f1389bfea13c0ed78f663b765baaff54a508e5483786bd6ece73c5e3e3cbe \
     https://curl.se/ca/cacert-2026-10-20.pem /cacert.pem
 
-FROM ubuntu:24.04@sha256:9c7f200c07e3d4a03e7249d2c16bf66a51120fb876aa2242cf31451412543289 AS apt-base
+FROM ubuntu:24.04@sha256:562111b88caa79c71391c0c4d3c2114a7d5c35915c20561fd893cb1e07929e6b AS apt-base
 COPY --chmod=755 scripts/install-container-deps.sh /usr/local/sbin/install-container-deps
 
 FROM apt-base AS builder
