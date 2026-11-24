@@ -1,12 +1,38 @@
 # Changelog
 
+## [1.0.12] - Unreleased
+
+### Changed
+
+- keep local instruction files out of git.
+- add a navigation index for docs/.
+- add line-ending and language attributes.
+- preserve merge identity and withdrawn auto-merge requests (#136).
+- validate the toolkit before scope regeneration (#130).
+- cover ordinary documentation without weakening validation (#129).
+- scope documentation changes while preserving release qualification (#128).
+- migrate dependency updates to Renovate.
+- synchronize exported pytest-asyncio hashes.
+- recheck automatic publication source (#125).
+
+### Upgrade
+
+Use the existing installation procedure and preserve local configuration. No
+sensor protocol or configuration migration is required. Software checks do not
+replace physical sensor, firmware installation or live Venus OS acceptance.
+
+### Security
+
+The base remains pinned by its SHA-256 digest. Package, native import, non-root
+runtime and dependency scanning checks remain required; no new application
+vulnerability fix is claimed.
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.11] - Unreleased
-
+## [1.0.11] - 2026-11-02
 ### Changed
 
 - Refresh the immutable Ubuntu 24.04 base used by both container build and runtime stages.
